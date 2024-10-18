@@ -1,8 +1,10 @@
+import os
+
+import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
-import os
+
 
 def load_graphs_to_dataframe(directory='graphs', file_prefix='adj_matrix'):
     """
@@ -41,14 +43,6 @@ class RandomGraphGenerator:
         """
         return nx.to_numpy_array(graph)
 
-    def plot_graph(self, graph):
-        """
-        Plots the graph.
-        """
-        plt.figure(figsize=(8, 8))
-        pos = nx.spring_layout(graph)
-        nx.draw(graph, pos, with_labels=True, node_color="lightblue", node_size=500, font_size=10)
-        plt.show(block=True)
 
     def generate_multiple_graphs(self, shots):
         """
