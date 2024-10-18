@@ -5,3 +5,5 @@ numpy
 networkx
 qiskit
 pylatexenc
+torch
+ray
