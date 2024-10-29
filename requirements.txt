@@ -8,3 +8,4 @@ pylatexenc
 tensorflow ==2.17.0
 keras
 ray
+tqdm

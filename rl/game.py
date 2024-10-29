@@ -1,14 +1,23 @@
 import numpy as np
 import copy
 import itertools
-import matplotlib.pyplot as plt  # Added import for plotting
+import matplotlib.pyplot as plt
+import yaml
 
-# Game settings
-N = 6  # Size of the matrix (N x N upper triangular matrix)
-a = 1  # Points for each action (added each time a column pair is selected)
-b = 2  # Penalty points when reusing columns included in the set
-MAX_STEPS = 50  # Maximum number of steps to forcibly end the game
+# Load game settings from config.yaml
+with open('config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
 
+game_settings = config['game_settings']
+N = game_settings['N']  # Size of the matrix (N x N upper triangular matrix)
+a = game_settings['a']  # Points for each action (added each time a column pair is selected)
+b = game_settings['b']  # Penalty points when reusing columns included in the set
+MAX_STEPS = game_settings['MAX_STEPS']  # Maximum number of steps to forcibly end the game
+
+# Define global variables
+coupling_map = None
+coupling_map_mat = None
+used_columns_set = set()
 """
 Game Description:
 The objective of this game is to turn all elements of an N x N upper triangular matrix `mat` consisting of 0s and 1s into 0.
@@ -30,6 +39,19 @@ Scoring:
 - The total points accumulated until the end of the game are the final score.
 - The goal is to minimize the score.
 """
+
+
+# Initialize the coupling map and related variables
+def initialize_game():
+    global coupling_map, coupling_map_mat, ACTIONS, ACTION_SPACE
+    coupling_map = get_coupling_map()
+    coupling_map_mat = get_coupling_map_mat(coupling_map)
+    ACTIONS = list(get_valid_actions(coupling_map))
+    ACTION_SPACE = len(ACTIONS)
+
+def reset_used_columns_set():
+    global used_columns_set
+    used_columns_set = set()
 
 # Function to initialize an upper triangular matrix
 def get_initial_state():
@@ -69,22 +91,22 @@ def get_valid_actions(coupling_map):
     return list(coupling_map)
 
 # Function to update the state
-def step(mat, action, coupling_map_mat, used_columns_set):
+def step(mat, action):
     """
     Generates a new state based on the current matrix `mat` and the selected action `action`.
     Also calculates the score according to the action.
 
     Parameters:
     - mat: Current state matrix
-    - action: Selected column pair (tuple)
-    - coupling_map_mat: Matrix generated from coupling_map
-    - used_columns_set: Set of used columns
+    - action: Selected action index (integer)
 
     Returns:
     - new_mat: Updated matrix
     - action_score: Points gained in this step
+    - done: Boolean indicating if the game is finished
     """
-    col1, col2 = action
+    global used_columns_set
+    col1, col2 = ACTIONS[action]
     new_mat = mat.copy()
     # Swap columns
     new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
@@ -97,7 +119,8 @@ def step(mat, action, coupling_map_mat, used_columns_set):
         action_score += b
         used_columns_set.clear()
     used_columns_set.update([col1, col2])
-    return new_mat, action_score
+    done = is_done(new_mat)
+    return new_mat, action_score, done
 
 # Function to check if the game is finished
 def is_done(mat):
@@ -110,7 +133,42 @@ def is_done(mat):
     """
     return np.all(mat == 0)
 
-# Function to save the state matrix as an image
+# Function to get the reward
+def get_reward(mat, total_score):
+    """
+    Calculates the reward for the given state.
+
+    Parameters:
+    - mat: Current state matrix
+    - total_score: Total score accumulated so far
+
+    Returns:
+    - reward: The reward for the current state
+    """
+    if is_done(mat):
+        # If the game is finished, give a high positive reward
+        reward = 100 - total_score
+    else:
+        # Otherwise, negative reward proportional to the total score
+        reward = -total_score
+    return reward
+
+# Function to encode the state for neural network input
+def encode_state(mat):
+    """
+    Encodes the state matrix into a format suitable for neural network input.
+
+    Parameters:
+    - mat: Current state matrix
+
+    Returns:
+    - encoded_state: A numpy array suitable for network input
+    """
+    # Reshape to (N, N, 1) and normalize if necessary
+    encoded_state = mat.reshape(N, N, 1).astype(np.float32)
+    return encoded_state
+
+# Function to save the state matrix as an image (optional)
 def save_state(mat, step_num):
     """
     Saves the current state matrix `mat` as an image.
@@ -123,55 +181,11 @@ def save_state(mat, step_num):
     """
     filename = f"state_step_{step_num}.png"
     plt.figure(figsize=(6, 6))
-    # plt.imshow(mat, cmap='gray_r', interpolation='nearest')
+    plt.imshow(mat, cmap='gray_r', interpolation='nearest')
     plt.axis('off')
     plt.savefig(filename, bbox_inches='tight', pad_inches=0)
     plt.close()
     print(f"State at step {step_num} saved to {filename}")
 
-# Function to play the game
-def play_game():
-    """
-    Executes the game and simulates the steps until all elements of the matrix become zero.
-    """
-    mat = get_initial_state()
-    coupling_map = get_coupling_map()
-    coupling_map_mat = get_coupling_map_mat(coupling_map)
-    used_columns_set = set()
-    total_score = 0
-    actions_taken = []
-    step_count = 0  # Step counter
-
-    print("Initial matrix:")
-    print(mat)
-
-    # Save initial state as an image
-    save_state(mat, step_count)
-
-    while not is_done(mat) and step_count < MAX_STEPS:
-        valid_actions = get_valid_actions(coupling_map)
-        # Randomly select an action (to be optimized with AlphaZero)
-        action = valid_actions[np.random.randint(len(valid_actions))]
-        actions_taken.append(action)
-        mat, action_score = step(mat, action, coupling_map_mat, used_columns_set)
-        total_score += action_score
-        step_count += 1
-
-        # Save current state as an image
-        save_state(mat, step_count)
-
-        # Debug output
-        print(f"\nStep {step_count}")
-        print(f"Action taken: {action}, Current score: {total_score}")
-        print(f"Current matrix:\n{mat}")
-
-    if is_done(mat):
-        print(f"\nGame finished successfully in {step_count} steps with total score: {total_score}")
-    else:
-        print(f"\nGame terminated after reaching the maximum steps ({MAX_STEPS}).")
-        print(f"Current score: {total_score}")
-
-    print(f"Actions taken: {actions_taken}")
-
-if __name__ == "__main__":
-    play_game()
+# Initialize game variables
+initialize_game()
