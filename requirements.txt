@@ -4,6 +4,7 @@ pandas
 numpy
 networkx
 qiskit
+qiskit_ibm_runtime
 pylatexenc
 tensorflow ==2.17.0
 keras

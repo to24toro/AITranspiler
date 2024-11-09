@@ -6,7 +6,7 @@ from qiskit.quantum_info import SparsePauliOp
 
 
 class GraphAnsatzConverter:
-    
+
     def __init__(self, graph: nx.Graph):
         self.graph = graph
         self.pauli_list = self.build_max_cut_paulis(graph)
@@ -17,7 +17,7 @@ class GraphAnsatzConverter:
         Convert a NetworkX graph to a list of Pauli operators for the Max-Cut problem.
 
         Parameters:
-        - graph: nx.Graph, the input NetworkX graph where nodes are qubits 
+        - graph: nx.Graph, the input NetworkX graph where nodes are qubits
           and edges represent interactions with weights.
 
         Returns:
@@ -59,4 +59,3 @@ class GraphAnsatzConverter:
         circuit = QAOAAnsatz(cost_operator=self.hamiltonian, reps=reps)
         circuit.measure_all()
         return circuit
-

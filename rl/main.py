@@ -1,27 +1,26 @@
-from dataclasses import dataclass
-import time
-import random
-from pathlib import Path
+import os
 import shutil
+from dataclasses import dataclass
+from pathlib import Path
 
-import tensorflow as tf
 import numpy as np
 import ray
-from tqdm import tqdm
+import tensorflow as tf
 import yaml
 
-from network import ResNet
-from mcts import MCTS
-from buffer import ReplayBuffer
-import game
+from rl import game
+from rl.buffer import ReplayBuffer
+from rl.mcts import MCTS
+from rl.network import ResNet
 
 # Load training settings from config.yaml
-with open('config.yaml', 'r') as f:
+with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-training_settings = config['training_settings']
-network_settings = config['network_settings']
-mcts_settings = config['mcts_settings']
+training_settings = config["training_settings"]
+network_settings = config["network_settings"]
+mcts_settings = config["mcts_settings"]
+
 
 @dataclass
 class Sample:
@@ -29,11 +28,15 @@ class Sample:
     mcts_policy: np.ndarray
     reward: float
 
+
 @ray.remote(num_cpus=1, num_gpus=0)
-def selfplay(weights):
+def selfplay(weights, test=False):
     """Perform a self-play game and collect training data."""
     record = []
-    state = game.get_initial_state()
+    if test:
+        state = game.get_initial_test_state()
+    else:
+        state = game.get_initial_state()
     game.reset_used_columns_set()
     network = ResNet(action_space=game.ACTION_SPACE)
 
@@ -47,10 +50,13 @@ def selfplay(weights):
     step_count = 0
 
     while not done and step_count < game.MAX_STEPS:
-        mcts_policy = mcts.search(root_state=state, num_simulations=mcts_settings['num_mcts_simulations'])
+        mcts_policy = mcts.search(
+            root_state=state, num_simulations=mcts_settings["num_mcts_simulations"]
+        )
         action = np.random.choice(range(game.ACTION_SPACE), p=mcts_policy)
         record.append(Sample(state.copy(), mcts_policy, reward=None))
-        state, action_score, done = game.step(state, action)
+        state, action_score, done = game.step(state, action, mcts_policy)
+        # print(state, action_score, done)
         total_score += action_score
         step_count += 1
 
@@ -63,15 +69,17 @@ def selfplay(weights):
 
     return record
 
-def main():
+
+def main(test=False):
     """Main training loop."""
-    num_cpus = training_settings['num_cpus']
-    n_episodes = training_settings['n_episodes']
-    buffer_size = training_settings['buffer_size']
-    batch_size = training_settings['batch_size']
-    epochs_per_update = training_settings['epochs_per_update']
-    update_period = training_settings['update_period']
-    save_period = training_settings['save_period']
+    num_cpus = training_settings["num_cpus"]
+    n_episodes = training_settings["n_episodes"]
+    buffer_size = training_settings["buffer_size"]
+    batch_size = training_settings["batch_size"]
+    epochs_per_update = training_settings["epochs_per_update"]
+    update_period = training_settings["update_period"]
+    save_period = training_settings["save_period"]
+    os.makedirs("checkpoints", exist_ok=True)
 
     ray.init(num_cpus=num_cpus, num_gpus=1, local_mode=False)
 
@@ -90,14 +98,15 @@ def main():
 
     current_weights = ray.put(network.get_weights())
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=network_settings['learning_rate'])
+    optimizer = tf.keras.optimizers.Adam(
+        learning_rate=network_settings["learning_rate"]
+    )
 
     replay = ReplayBuffer(buffer_size=buffer_size)
 
     # Start self-play workers
     work_in_progresses = [
-        selfplay.remote(current_weights)
-        for _ in range(num_cpus - 1)
+        selfplay.remote(current_weights, test) for _ in range(num_cpus - 1)
     ]
 
     n_updates = 0
@@ -108,20 +117,22 @@ def main():
             finished, work_in_progresses = ray.wait(work_in_progresses, num_returns=1)
             replay.add_record(ray.get(finished[0]))
             # Start a new self-play worker
-            work_in_progresses.extend([
-                selfplay.remote(current_weights)
-            ])
+            work_in_progresses.extend([selfplay.remote(current_weights, test)])
             n += 1
 
         # Update network
         if len(replay) >= batch_size:
             num_iters = epochs_per_update * (len(replay) // batch_size)
             for i in range(num_iters):
-                states, mcts_policy, rewards = replay.get_minibatch(batch_size=batch_size)
+                states, mcts_policy, rewards = replay.get_minibatch(
+                    batch_size=batch_size
+                )
                 with tf.GradientTape() as tape:
                     p_pred, v_pred = network(states, training=True)
                     value_loss = tf.square(rewards - v_pred)
-                    policy_loss = -tf.reduce_sum(mcts_policy * tf.math.log(p_pred + 1e-10), axis=1, keepdims=True)
+                    policy_loss = -tf.reduce_sum(
+                        mcts_policy * tf.math.log(p_pred + 1e-10), axis=1, keepdims=True
+                    )
                     loss = tf.reduce_mean(value_loss + policy_loss)
 
                 grads = tape.gradient(loss, network.trainable_variables)
@@ -130,13 +141,18 @@ def main():
 
                 if i % 100 == 0:
                     with summary_writer.as_default():
-                        tf.summary.scalar("value_loss", tf.reduce_mean(value_loss), step=n_updates)
-                        tf.summary.scalar("policy_loss", tf.reduce_mean(policy_loss), step=n_updates)
+                        tf.summary.scalar(
+                            "value_loss", tf.reduce_mean(value_loss), step=n_updates
+                        )
+                        tf.summary.scalar(
+                            "policy_loss", tf.reduce_mean(policy_loss), step=n_updates
+                        )
 
             current_weights = ray.put(network.get_weights())
 
         if n % save_period == 0:
-            network.save_weights("checkpoints/network")
+            network.save_weights(f"checkpoints/network_{n}.weights.h5")
+
 
 if __name__ == "__main__":
     main()

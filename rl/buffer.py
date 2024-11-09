@@ -1,6 +1,9 @@
 import collections
+
 import numpy as np
-import game
+
+from rl import game
+
 
 class ReplayBuffer:
     def __init__(self, buffer_size):

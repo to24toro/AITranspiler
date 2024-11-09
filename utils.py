@@ -9,10 +9,17 @@ def plot_graph(graph):
     """
     plt.figure(figsize=(8, 8))
     pos = nx.spring_layout(graph)
-    nx.draw(graph, pos, with_labels=True, node_color="lightblue", node_size=500, font_size=10)
+    nx.draw(
+        graph,
+        pos,
+        with_labels=True,
+        node_color="lightblue",
+        node_size=500,
+        font_size=10,
+    )
     plt.show(block=True)
-    
-    
+
+
 def load_graph_from_npy(file_path):
     """
     Load a graph from a .npy file containing an adjacency matrix.

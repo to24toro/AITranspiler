@@ -1,26 +1,29 @@
 import os
 
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 
 
-def load_graphs_to_dataframe(directory='graphs', file_prefix='adj_matrix'):
+def load_graphs_to_dataframe(directory="graphs", file_prefix="adj_matrix"):
     """
     Loads all .npy adjacency matrix files from the specified directory,
-    flattens each matrix, and returns a pandas DataFrame with each row 
+    flattens each matrix, and returns a pandas DataFrame with each row
     representing a flattened adjacency matrix.
     """
     matrices = []
-    files = [f for f in os.listdir(directory) if f.startswith(file_prefix) and f.endswith('.npy')]
-    
+    files = [
+        f
+        for f in os.listdir(directory)
+        if f.startswith(file_prefix) and f.endswith(".npy")
+    ]
+
     for file in sorted(files):
         file_path = os.path.join(directory, file)
         matrix = np.load(file_path)
         flattened_matrix = matrix.flatten()
         matrices.append(flattened_matrix)
-    
+
     df = pd.DataFrame(matrices)
     return df
 
@@ -34,7 +37,7 @@ class RandomGraphGenerator:
         Generates a random graph based on the number of nodes.
         Ensures that the graph is connected and undirected.
         """
-        graph = nx.random_regular_graph(d=3, n=self.num_nodes,seed=1234)
+        graph = nx.random_regular_graph(d=3, n=self.num_nodes)
         return graph
 
     def get_adjacency_matrix(self, graph):
@@ -42,7 +45,6 @@ class RandomGraphGenerator:
         Returns the adjacency matrix of the graph.
         """
         return nx.to_numpy_array(graph)
-
 
     def generate_multiple_graphs(self, shots):
         """
@@ -55,12 +57,12 @@ class RandomGraphGenerator:
             matrices.append(matrix)
         return matrices
 
-    def save_adjacency_matrices(self, matrices, file_prefix='adj_matrix'):
+    def save_adjacency_matrices(self, matrices, file_prefix="adj_matrix"):
         """
         Saves the adjacency matrices to files.
         """
-        os.makedirs('graphs', exist_ok=True)
+        os.makedirs("graphs", exist_ok=True)
         for i, matrix in enumerate(matrices):
-            file_name = f'graphs/{file_prefix}_{i+1}.npy'
+            file_name = f"graphs/{file_prefix}_{i+1}.npy"
             np.save(file_name, matrix)
-            print(f'Adjacency matrix saved to {file_name}')
+            print(f"Adjacency matrix saved to {file_name}")

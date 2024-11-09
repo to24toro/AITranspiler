@@ -1,0 +1,28 @@
+game_settings:
+  N: 3  # Size of the matrix (N x N upper triangular matrix)
+  a: 1  # Points for each action (added each time a column pair is selected)
+  b: 3  # Penalty points when reusing columns included in the set. N//2
+  MAX_STEPS: 3  # Maximum number of steps to forcibly end the game. (NC2)**(2N) if 3-正則
+
+
+mcts_settings:
+  c_puct: 1.8
+  epsilon: 0.25
+  dirichlet_alpha: 0.35
+  num_mcts_simulations: 50
+  max_depth: 9 # N * N
+
+network_settings:
+  n_blocks: 20
+  filters: 256
+  use_bias: False
+  learning_rate: 0.0005
+
+training_settings:
+  num_cpus: 2
+  n_episodes: 1
+  buffer_size: 40
+  batch_size: 64
+  epochs_per_update: 5
+  update_period: 30
+  save_period: 30

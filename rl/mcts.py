@@ -1,25 +1,26 @@
 import math
 import random
-import json
 
 import numpy as np
 import tensorflow as tf
 import yaml
 
-import game
+from rl import game
 
 # Load MCTS settings from config.yaml
-with open('config.yaml', 'r') as f:
+with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-mcts_settings = config['mcts_settings']
+mcts_settings = config["mcts_settings"]
+
 
 class MCTS:
     def __init__(self, network):
         self.network = network
-        self.alpha = mcts_settings['dirichlet_alpha']
-        self.c_puct = mcts_settings['c_puct']
-        self.epsilon = mcts_settings['epsilon']
+        self.alpha = mcts_settings["dirichlet_alpha"]
+        self.c_puct = mcts_settings["c_puct"]
+        self.epsilon = mcts_settings["epsilon"]
+        self.max_depth = mcts_settings["max_depth"]
 
         #: Prior probability
         self.P = {}
@@ -34,7 +35,9 @@ class MCTS:
         self.next_states = {}
 
         #: Use JSON string of the state matrix as the key
-        self.state_to_str = lambda state: json.dumps(state.tolist())
+        self.state_to_str = lambda state: "".join(
+            map(str, state.astype(int).flatten().tolist())
+        )
 
     def search(self, root_state, num_simulations):
         s = self.state_to_str(root_state)
@@ -53,10 +56,16 @@ class MCTS:
         #: MCTS simulation
         for _ in range(num_simulations):
             U = [
-                self.c_puct * self.P[s][a] * math.sqrt(sum(self.N[s])) / (1 + self.N[s][a])
+                self.c_puct
+                * self.P[s][a]
+                * math.sqrt(sum(self.N[s]))
+                / (1 + self.N[s][a])
                 for a in range(game.ACTION_SPACE)
             ]
-            Q = [self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0 for a in range(game.ACTION_SPACE)]
+            Q = [
+                self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0
+                for a in range(game.ACTION_SPACE)
+            ]
 
             assert len(U) == len(Q) == game.ACTION_SPACE
 
@@ -66,8 +75,7 @@ class MCTS:
             action = random.choice(np.where(scores == np.max(scores))[0])
 
             next_state, _ = self.next_states[s][action]
-
-            v = -self._evaluate(next_state)
+            v = self._evaluate(next_state, max_depth=self.max_depth)
 
             self.W[s][action] += v
             self.N[s][action] += 1
@@ -96,36 +104,39 @@ class MCTS:
 
         return nn_value
 
-    def _evaluate(self, state):
+    def _evaluate(self, state, depth=0, max_depth=1000):
+        if depth >= max_depth:
+            return -np.inf
+
         s = self.state_to_str(state)
 
         if game.is_done(state):
-            #: Game over
             reward = game.get_reward(state, 0)
             return reward
 
         elif s not in self.P:
-            #: Expand leaf node
             nn_value = self._expand(state)
             return nn_value
 
         else:
-            #: Evaluate child node
             U = [
-                self.c_puct * self.P[s][a] * math.sqrt(sum(self.N[s])) / (1 + self.N[s][a])
+                self.c_puct
+                * self.P[s][a]
+                * math.sqrt(sum(self.N[s]))
+                / (1 + self.N[s][a])
                 for a in range(game.ACTION_SPACE)
             ]
-            Q = [self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0 for a in range(game.ACTION_SPACE)]
-
-            assert len(U) == len(Q) == game.ACTION_SPACE
+            Q = [
+                self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0
+                for a in range(game.ACTION_SPACE)
+            ]
 
             scores = [u + q for u, q in zip(U, Q)]
-
             action = random.choice(np.where(scores == np.max(scores))[0])
 
             next_state, _ = self.next_states[s][action]
 
-            v = -self._evaluate(next_state)
+            v = self._evaluate(next_state, depth=depth + 1, max_depth=max_depth)
 
             self.W[s][action] += v
             self.N[s][action] += 1

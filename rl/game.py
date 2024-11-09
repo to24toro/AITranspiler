@@ -1,18 +1,20 @@
-import numpy as np
-import copy
-import itertools
 import matplotlib.pyplot as plt
+import numpy as np
 import yaml
 
 # Load game settings from config.yaml
-with open('config.yaml', 'r') as f:
+with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-game_settings = config['game_settings']
-N = game_settings['N']  # Size of the matrix (N x N upper triangular matrix)
-a = game_settings['a']  # Points for each action (added each time a column pair is selected)
-b = game_settings['b']  # Penalty points when reusing columns included in the set
-MAX_STEPS = game_settings['MAX_STEPS']  # Maximum number of steps to forcibly end the game
+game_settings = config["game_settings"]
+N = game_settings["N"]  # Size of the matrix (N x N  matrix)
+a = game_settings[
+    "a"
+]  # Points for each action (added each time a column pair is selected)
+b = game_settings["b"]  # Penalty points when reusing columns included in the set
+MAX_STEPS = game_settings[
+    "MAX_STEPS"
+]  # Maximum number of steps to forcibly end the game
 
 # Define global variables
 coupling_map = None
@@ -20,7 +22,7 @@ coupling_map_mat = None
 used_columns_set = set()
 """
 Game Description:
-The objective of this game is to turn all elements of an N x N upper triangular matrix `mat` consisting of 0s and 1s into 0.
+The objective of this game is to turn all elements of an N x N  matrix `mat` consisting of 0s and 1s into 0.
 
 Game Procedure:
 1. Select a pair of columns (i, j) from the `coupling_map`.
@@ -49,17 +51,46 @@ def initialize_game():
     ACTIONS = list(get_valid_actions(coupling_map))
     ACTION_SPACE = len(ACTIONS)
 
+
 def reset_used_columns_set():
     global used_columns_set
     used_columns_set = set()
 
-# Function to initialize an upper triangular matrix
+
+def _generate_binary_symmetric_matrix():
+    upper_triangle = np.triu(np.random.randint(0, 2, size=(N, N)), k=1)
+    symmetric_matrix = upper_triangle + upper_triangle.T
+    np.fill_diagonal(symmetric_matrix, 0)
+    return symmetric_matrix
+
+
+# Function to initialize an  matrix
 def get_initial_state():
     """
-    Generates an N x N upper triangular matrix consisting of random 0s and 1s.
+    Generates an N x N  matrix consisting of random 0s and 1s.
     """
-    mat = np.triu(np.random.randint(0, 2, size=(N, N)))
+
+    mat = _generate_binary_symmetric_matrix()
+    mat = mat - np.multiply(mat, coupling_map_mat)
     return mat
+
+
+def get_initial_test_state():
+    """
+    Generates an N x N  matrix consisting of random 0s and 1s.
+    """
+
+    mat = np.array(
+        [
+            [0, 0, 1, 1],
+            [0, 0, 1, 1],
+            [1, 1, 0, 1],
+            [1, 1, 1, 0],
+        ]
+    )
+    mat = mat - np.multiply(mat, coupling_map_mat)
+    return mat
+
 
 # Function to generate coupling_map
 def get_coupling_map():
@@ -72,16 +103,19 @@ def get_coupling_map():
         coupling_map.add((i, i + 1))
     return coupling_map
 
+
 # Function to generate a matrix from coupling_map
 def get_coupling_map_mat(coupling_map):
     """
-    Generates an upper triangular matrix from coupling_map.
+    Generates an  matrix from coupling_map.
     For each column pair (i, j) in coupling_map, sets the position (i, j) in the matrix to 1.
     """
     coupling_map_mat = np.zeros((N, N))
-    for (i, j) in coupling_map:
+    for i, j in coupling_map:
         coupling_map_mat[i, j] = 1
-    return np.triu(coupling_map_mat)  # Make it an upper triangular matrix
+        coupling_map_mat[j, i] = 1
+    return coupling_map_mat
+
 
 # Function to get valid actions
 def get_valid_actions(coupling_map):
@@ -90,8 +124,9 @@ def get_valid_actions(coupling_map):
     """
     return list(coupling_map)
 
+
 # Function to update the state
-def step(mat, action):
+def step(mat, action, mcts_policy=None):
     """
     Generates a new state based on the current matrix `mat` and the selected action `action`.
     Also calculates the score according to the action.
@@ -107,9 +142,19 @@ def step(mat, action):
     """
     global used_columns_set
     col1, col2 = ACTIONS[action]
+    while (
+        mcts_policy is not None
+        and np.all(mat[:, col1] == 0)
+        and np.all(mat[:, col2] == 0)
+    ):
+        action = np.random.choice(range(ACTION_SPACE), p=mcts_policy)
+        col1, col2 = ACTIONS[action]
+
     new_mat = mat.copy()
+
     # Swap columns
     new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
+    new_mat[[col1, col2], :] = new_mat[[col2, col1], :]
     # Element-wise multiplication and subtraction
     new_mat = new_mat - np.multiply(new_mat, coupling_map_mat)
     new_mat = np.clip(new_mat, 0, 1)  # Prevent elements from becoming negative
@@ -122,6 +167,7 @@ def step(mat, action):
     done = is_done(new_mat)
     return new_mat, action_score, done
 
+
 # Function to check if the game is finished
 def is_done(mat):
     """
@@ -132,6 +178,7 @@ def is_done(mat):
     - False: There are still non-zero elements
     """
     return np.all(mat == 0)
+
 
 # Function to get the reward
 def get_reward(mat, total_score):
@@ -147,11 +194,12 @@ def get_reward(mat, total_score):
     """
     if is_done(mat):
         # If the game is finished, give a high positive reward
-        reward = 100 - total_score
+        reward = 10000.0 - total_score
     else:
         # Otherwise, negative reward proportional to the total score
         reward = -total_score
     return reward
+
 
 # Function to encode the state for neural network input
 def encode_state(mat):
@@ -168,6 +216,7 @@ def encode_state(mat):
     encoded_state = mat.reshape(N, N, 1).astype(np.float32)
     return encoded_state
 
+
 # Function to save the state matrix as an image (optional)
 def save_state(mat, step_num):
     """
@@ -181,11 +230,12 @@ def save_state(mat, step_num):
     """
     filename = f"state_step_{step_num}.png"
     plt.figure(figsize=(6, 6))
-    plt.imshow(mat, cmap='gray_r', interpolation='nearest')
-    plt.axis('off')
-    plt.savefig(filename, bbox_inches='tight', pad_inches=0)
+    plt.imshow(mat, cmap="gray_r", interpolation="nearest")
+    plt.axis("off")
+    plt.savefig(filename, bbox_inches="tight", pad_inches=0)
     plt.close()
     print(f"State at step {step_num} saved to {filename}")
+
 
 # Initialize game variables
 initialize_game()
