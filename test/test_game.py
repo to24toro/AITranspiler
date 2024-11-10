@@ -10,7 +10,7 @@ class TestGameFunctions(unittest.TestCase):
     def setUp(self):
         # Initialize game settings
         game.initialize_game()
-        game.reset_used_columns_set()
+        game.reset_used_columns()
 
     def test_get_initial_state(self):
         state = game.get_initial_state()
@@ -64,7 +64,7 @@ class TestGameFunctions(unittest.TestCase):
         zero_state = np.zeros((game.N, game.N))
         total_score = 10
         reward = game.get_reward(zero_state, total_score)
-        self.assertEqual(reward, 10000.0 - total_score)
+        self.assertEqual(reward, 100)
         non_zero_state = zero_state.copy()
         non_zero_state[0, 1] = 1
         reward = game.get_reward(non_zero_state, total_score)
@@ -76,10 +76,12 @@ class TestGameFunctions(unittest.TestCase):
         self.assertEqual(encoded_state.shape, (game.N, game.N, 1))
         self.assertEqual(encoded_state.dtype, np.float32)
 
-    def test_reset_used_columns_set(self):
+    def test_reset_used_columns(self):
         game.used_columns_set.add(1)
-        game.reset_used_columns_set()
+        game.used_pair.append([1,2])
+        game.reset_used_columns()
         self.assertEqual(len(game.used_columns_set), 0)
+        self.assertEqual(len(game.used_pair), 0)
 
     def test_save_state(self):
         # This test will check if the function runs without error

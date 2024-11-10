@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import yaml
+from collections import deque
 
 # Load game settings from config.yaml
 with open("config.yaml", "r") as f:
@@ -20,6 +21,7 @@ MAX_STEPS = game_settings[
 coupling_map = None
 coupling_map_mat = None
 used_columns_set = set()
+used_pair = deque()
 """
 Game Description:
 The objective of this game is to turn all elements of an N x N  matrix `mat` consisting of 0s and 1s into 0.
@@ -35,7 +37,7 @@ Game Procedure:
 
 Scoring:
 - Add `a` points for each action (selection of a column pair).
-- Save the columns used in the action in the set `used_columns_set`.
+- Save the columns used in the action in the set `used_columns_set` and `used_pair`.
 - If a column included in this set is used again in a new action,
   add `b` penalty points and reset the set to empty.
 - The total points accumulated until the end of the game are the final score.
@@ -52,9 +54,11 @@ def initialize_game():
     ACTION_SPACE = len(ACTIONS)
 
 
-def reset_used_columns_set():
+def reset_used_columns():
     global used_columns_set
+    global used_pair
     used_columns_set = set()
+    used_pair = deque()
 
 
 def _generate_binary_symmetric_matrix():
@@ -141,17 +145,23 @@ def step(mat, action, mcts_policy=None):
     - done: Boolean indicating if the game is finished
     """
     global used_columns_set
+    global used_pair
     col1, col2 = ACTIONS[action]
+    if col1 > col2:
+        col1,col2 = col2, col1
     while (
         mcts_policy is not None
-        and np.all(mat[:, col1] == 0)
-        and np.all(mat[:, col2] == 0)
+        and ((np.all(mat[:, col1] == 0) and np.all(mat[:, col2] == 0))
+        or (used_pair and (col1, col2) == used_pair[-1]))
     ):
         action = np.random.choice(range(ACTION_SPACE), p=mcts_policy)
         col1, col2 = ACTIONS[action]
+        print(mcts_policy)
+        print(col1,col2)
+        # print(col1,col2)
 
     new_mat = mat.copy()
-
+    used_pair.append((col1,col2))
     # Swap columns
     new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
     new_mat[[col1, col2], :] = new_mat[[col2, col1], :]
@@ -194,10 +204,12 @@ def get_reward(mat, total_score):
     """
     if is_done(mat):
         # If the game is finished, give a high positive reward
-        reward = 10000.0 - total_score
+        # reward = 100 - total_score  # ゲームクリア時の報酬から合計スコアを引く
+        reward = 5
     else:
-        # Otherwise, negative reward proportional to the total score
-        reward = -total_score
+        # Game not finished yet
+        # reward = -total_score  # 現在の合計スコアの負の値
+        reward = -5
     return reward
 
 

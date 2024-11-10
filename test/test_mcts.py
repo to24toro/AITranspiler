@@ -13,7 +13,7 @@ class TestMCTS(unittest.TestCase):
     def setUp(self):
         # Initialize game and network
         game.initialize_game()
-        game.reset_used_columns_set()
+        game.reset_used_columns()
         self.state = game.get_initial_state()
         self.network = ResNet(action_space=game.ACTION_SPACE)
         # Initialize network weights

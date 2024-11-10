@@ -10,7 +10,7 @@ mcts_settings:
   epsilon: 0.25
   dirichlet_alpha: 0.35
   num_mcts_simulations: 50
-  max_depth: 9 # N * N
+  max_depth: 9 # N * N recursive loopに対応
 
 network_settings:
   n_blocks: 20

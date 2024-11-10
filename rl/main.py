@@ -37,7 +37,7 @@ def selfplay(weights, test=False):
         state = game.get_initial_test_state()
     else:
         state = game.get_initial_state()
-    game.reset_used_columns_set()
+    game.reset_used_columns()
     network = ResNet(action_space=game.ACTION_SPACE)
 
     # Initialize network parameters
@@ -133,9 +133,12 @@ def main(test=False):
                     policy_loss = -tf.reduce_sum(
                         mcts_policy * tf.math.log(p_pred + 1e-10), axis=1, keepdims=True
                     )
-                    loss = tf.reduce_mean(value_loss + policy_loss)
+                    value_loss_weight = 0.5
+                    policy_loss_weight = 1.0
+                    loss = tf.reduce_mean(value_loss_weight * value_loss + policy_loss_weight * policy_loss)
 
                 grads = tape.gradient(loss, network.trainable_variables)
+                grads, _ = tf.clip_by_global_norm(grads, 1.0)
                 optimizer.apply_gradients(zip(grads, network.trainable_variables))
                 n_updates += 1
 

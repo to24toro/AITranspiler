@@ -75,10 +75,15 @@ class MCTS:
             action = random.choice(np.where(scores == np.max(scores))[0])
 
             next_state, _ = self.next_states[s][action]
-            v = self._evaluate(next_state, max_depth=self.max_depth)
+            v = self._evaluate(next_state,max_depth=self.max_depth)
 
             self.W[s][action] += v
             self.N[s][action] += 1
+            print(f"N[{s}]: {self.N[s]}")
+            print(f"W[{s}]: {self.W[s]}")
+            print(f"Q: {Q}")
+            print(f"U: {U}")
+            print(f"Scores: {scores}")
 
         mcts_policy = [self.N[s][a] / sum(self.N[s]) for a in range(game.ACTION_SPACE)]
 
@@ -101,17 +106,17 @@ class MCTS:
         self.next_states[s] = [
             (game.step(state, action)[0:2]) for action in range(game.ACTION_SPACE)
         ]
-
+        print(f"NN policy: {nn_policy}")
         return nn_value
 
-    def _evaluate(self, state, depth=0, max_depth=1000):
+    def _evaluate(self, state,total_score=0, depth=0, max_depth=1000):
         if depth >= max_depth:
             return -np.inf
 
         s = self.state_to_str(state)
 
         if game.is_done(state):
-            reward = game.get_reward(state, 0)
+            reward = game.get_reward(state, total_score)
             return reward
 
         elif s not in self.P:
@@ -135,10 +140,10 @@ class MCTS:
             action = random.choice(np.where(scores == np.max(scores))[0])
 
             next_state, _ = self.next_states[s][action]
+            next_state, action_score = self.next_states[s][action]
+            v = self._evaluate(next_state, total_score=total_score + action_score, depth=depth + 1, max_depth=max_depth)
 
-            v = self._evaluate(next_state, depth=depth + 1, max_depth=max_depth)
-
-            self.W[s][action] += v
+            self.W[s][action] = v
             self.N[s][action] += 1
 
             return v
