@@ -6,7 +6,7 @@ game_settings:
 
 
 mcts_settings:
-  c_puct: 1.0
+  c_puct: 5
   epsilon: 0.5
   dirichlet_alpha: 0.5
   num_mcts_simulations: 150 # 100以上
@@ -20,7 +20,7 @@ network_settings:
 
 training_settings:
   num_cpus: 8
-  n_episodes: 500
+  n_episodes: 200
   buffer_size: 100
   batch_size: 64
   epochs_per_update: 100

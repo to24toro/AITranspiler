@@ -38,8 +38,17 @@ class MCTS:
         self.state_to_str = lambda state: "".join(
             map(str, state.astype(int).flatten().tolist())
         )
+        self.initial_tau = 1.0  # 初期の温度パラメータ
+        self.final_tau = 0.01  # 最終的な温度パラメータ
+        self.tau_decay_steps = 20  # 温度パラメータを減衰させるエピソード数
+        self.current_episode = 0
+
+    def update_temperature(self):
+        decay_factor = min(1, self.current_episode / self.tau_decay_steps)
+        return self.initial_tau * (1 - decay_factor) + self.final_tau * decay_factor
 
     def search(self, root_state, num_simulations, prev_action):
+        tau = self.update_temperature()
         s = self.state_to_str(root_state)
 
         if s not in self.P:
@@ -47,13 +56,12 @@ class MCTS:
 
         valid_actions = game.get_valid_actions(root_state, prev_action)
 
-        #: Adding Dirichlet noise to the prior probabilities in the root node
         if self.alpha is not None:
             dirichlet_noise = np.random.dirichlet([self.alpha] * len(valid_actions))
             for a, noise in zip(valid_actions, dirichlet_noise):
                 self.P[s][a] = (1 - self.epsilon) * self.P[s][a] + self.epsilon * noise
 
-        #: MCTS simulation
+        # MCTSシミュレーション
         for _ in range(num_simulations):
             U = [
                 self.c_puct
@@ -71,6 +79,7 @@ class MCTS:
 
             scores = [u + q for u, q in zip(U, Q)]
 
+            # 無効なアクションのスコアをマイナス無限大に設定
             scores = np.array(
                 [
                     score if action in valid_actions else -np.inf
@@ -85,14 +94,12 @@ class MCTS:
 
             self.W[s][action] += v
             self.N[s][action] += 1
-            # print(f"Q: {Q}")
-            # print(f"U: {U}")
-            print(f"Scores: {scores}")
 
-        mcts_policy = np.array(
-            [self.N[s][a] / sum(self.N[s]) for a in range(game.ACTION_SPACE)]
-        )
-
+        # MCTSポリシーを温度パラメータで調整
+        visits = np.array([self.N[s][a] for a in range(game.ACTION_SPACE)])
+        mcts_policy = np.power(visits, 1 / tau)
+        mcts_policy /= np.sum(mcts_policy)  # 正規化して確率分布に
+        print(f"Scores: {scores}")
         return mcts_policy
 
     def _expand(self, state, prev_action):
@@ -118,7 +125,6 @@ class MCTS:
             )
             for action in range(game.ACTION_SPACE)
         ]
-        # print(f"NN policy: {nn_policy}")
         return nn_value
 
     def _evaluate(

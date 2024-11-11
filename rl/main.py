@@ -60,7 +60,6 @@ def selfplay(weights, test=False):
         record.append(Sample(state.copy(), mcts_policy, reward=None))
         state, done = game.step(state, action, prev_action, mcts_policy)
         prev_action = action
-        # print(state, action_score, done)
         # total_score += action_score
         step_count += 1
 
