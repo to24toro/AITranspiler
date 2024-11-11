@@ -39,13 +39,13 @@ class MCTS:
             map(str, state.astype(int).flatten().tolist())
         )
 
-    def search(self, root_state, num_simulations):
+    def search(self, root_state, num_simulations, prev_action):
         s = self.state_to_str(root_state)
 
         if s not in self.P:
-            _ = self._expand(root_state)
+            _ = self._expand(root_state, prev_action)
 
-        valid_actions = list(range(game.ACTION_SPACE))
+        valid_actions = game.get_valid_actions(root_state, prev_action)
 
         #: Adding Dirichlet noise to the prior probabilities in the root node
         if self.alpha is not None:
@@ -71,25 +71,31 @@ class MCTS:
 
             scores = [u + q for u, q in zip(U, Q)]
 
-            #: All actions are valid in this game
+            scores = np.array(
+                [
+                    score if action in valid_actions else -np.inf
+                    for action, score in enumerate(scores)
+                ]
+            )
+
             action = random.choice(np.where(scores == np.max(scores))[0])
 
-            next_state, _ = self.next_states[s][action]
-            v = self._evaluate(next_state,max_depth=self.max_depth)
+            next_state = self.next_states[s][action]
+            v = self._evaluate(next_state, prev_action=action, max_depth=self.max_depth)
 
             self.W[s][action] += v
             self.N[s][action] += 1
-            print(f"N[{s}]: {self.N[s]}")
-            print(f"W[{s}]: {self.W[s]}")
-            print(f"Q: {Q}")
-            print(f"U: {U}")
+            # print(f"Q: {Q}")
+            # print(f"U: {U}")
             print(f"Scores: {scores}")
 
-        mcts_policy = [self.N[s][a] / sum(self.N[s]) for a in range(game.ACTION_SPACE)]
+        mcts_policy = np.array(
+            [self.N[s][a] / sum(self.N[s]) for a in range(game.ACTION_SPACE)]
+        )
 
         return mcts_policy
 
-    def _expand(self, state):
+    def _expand(self, state, prev_action):
         s = self.state_to_str(state)
 
         with tf.device("/cpu:0"):
@@ -102,15 +108,23 @@ class MCTS:
         self.N[s] = [0] * game.ACTION_SPACE
         self.W[s] = [0] * game.ACTION_SPACE
 
+        valid_actions = game.get_valid_actions(state, prev_action)
         #: Cache next states
         self.next_states[s] = [
-            (game.step(state, action)[0:2]) for action in range(game.ACTION_SPACE)
+            (
+                game.step(state, action, prev_action)[0]
+                if (action in valid_actions)
+                else None
+            )
+            for action in range(game.ACTION_SPACE)
         ]
-        print(f"NN policy: {nn_policy}")
+        # print(f"NN policy: {nn_policy}")
         return nn_value
 
-    def _evaluate(self, state,total_score=0, depth=0, max_depth=1000):
-        if depth >= max_depth:
+    def _evaluate(
+        self, state, prev_action=None, total_score=0, depth=0, max_depth=1000
+    ):
+        if depth >= max_depth or state is None:
             return -np.inf
 
         s = self.state_to_str(state)
@@ -120,7 +134,7 @@ class MCTS:
             return reward
 
         elif s not in self.P:
-            nn_value = self._expand(state)
+            nn_value = self._expand(state, prev_action)
             return nn_value
 
         else:
@@ -135,15 +149,30 @@ class MCTS:
                 self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0
                 for a in range(game.ACTION_SPACE)
             ]
+            assert len(U) == len(Q) == game.ACTION_SPACE
+
+            valid_actions = game.get_valid_actions(state, prev_action)
 
             scores = [u + q for u, q in zip(U, Q)]
+            scores = np.array(
+                [
+                    score if action in valid_actions else -np.inf
+                    for action, score in enumerate(scores)
+                ]
+            )
+
             action = random.choice(np.where(scores == np.max(scores))[0])
 
-            next_state, _ = self.next_states[s][action]
-            next_state, action_score = self.next_states[s][action]
-            v = self._evaluate(next_state, total_score=total_score + action_score, depth=depth + 1, max_depth=max_depth)
+            next_state = self.next_states[s][action]
+            v = self._evaluate(
+                next_state,
+                prev_action=action,
+                total_score=total_score,
+                depth=depth + 1,
+                max_depth=max_depth,
+            )
 
-            self.W[s][action] = v
+            self.W[s][action] += v
             self.N[s][action] += 1
 
             return v

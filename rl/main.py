@@ -48,16 +48,20 @@ def selfplay(weights, test=False):
     done = False
     total_score = 0
     step_count = 0
+    prev_action = None
 
     while not done and step_count < game.MAX_STEPS:
         mcts_policy = mcts.search(
-            root_state=state, num_simulations=mcts_settings["num_mcts_simulations"]
+            root_state=state,
+            num_simulations=mcts_settings["num_mcts_simulations"],
+            prev_action=prev_action,
         )
         action = np.random.choice(range(game.ACTION_SPACE), p=mcts_policy)
         record.append(Sample(state.copy(), mcts_policy, reward=None))
-        state, action_score, done = game.step(state, action, mcts_policy)
+        state, done = game.step(state, action, prev_action, mcts_policy)
+        prev_action = action
         # print(state, action_score, done)
-        total_score += action_score
+        # total_score += action_score
         step_count += 1
 
     # The reward is calculated based on the final state
@@ -131,12 +135,9 @@ def main(test=False):
                     p_pred, v_pred = network(states, training=True)
                     value_loss = tf.square(rewards - v_pred)
                     policy_loss = -tf.reduce_sum(
-                        mcts_policy * tf.math.log(p_pred + 1e-10), axis=1, keepdims=True
+                        mcts_policy * tf.math.log(p_pred + 1e-5), axis=1, keepdims=True
                     )
-                    value_loss_weight = 0.5
-                    policy_loss_weight = 1.0
-                    loss = tf.reduce_mean(value_loss_weight * value_loss + policy_loss_weight * policy_loss)
-
+                    loss = tf.reduce_mean(value_loss + policy_loss)
                 grads = tape.gradient(loss, network.trainable_variables)
                 grads, _ = tf.clip_by_global_norm(grads, 1.0)
                 optimizer.apply_gradients(zip(grads, network.trainable_variables))

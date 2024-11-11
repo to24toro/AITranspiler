@@ -32,7 +32,7 @@ class ResNet(tf.keras.Model):
         self.bn1 = kl.BatchNormalization()
 
         self.policy_layers = self._build_head(2, self.action_space)
-        self.value_layers = self._build_head(1, 1, activation='tanh')
+        self.value_layers = self._build_head(1, 1, activation="tanh")
 
         self.res_blocks = [
             ResBlock(filters=self.filters, use_bias=self.use_bias)

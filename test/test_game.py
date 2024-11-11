@@ -78,7 +78,7 @@ class TestGameFunctions(unittest.TestCase):
 
     def test_reset_used_columns(self):
         game.used_columns_set.add(1)
-        game.used_pair.append([1,2])
+        game.used_pair.append([1, 2])
         game.reset_used_columns()
         self.assertEqual(len(game.used_columns_set), 0)
         self.assertEqual(len(game.used_pair), 0)

@@ -1,7 +1,9 @@
+import functools
+from collections import deque
+
 import matplotlib.pyplot as plt
 import numpy as np
 import yaml
-from collections import deque
 
 # Load game settings from config.yaml
 with open("config.yaml", "r") as f:
@@ -50,7 +52,8 @@ def initialize_game():
     global coupling_map, coupling_map_mat, ACTIONS, ACTION_SPACE
     coupling_map = get_coupling_map()
     coupling_map_mat = get_coupling_map_mat(coupling_map)
-    ACTIONS = list(get_valid_actions(coupling_map))
+    ACTIONS = coupling_map
+    # ACTIONS = list(get_valid_actions(state=None,prev_action=None))
     ACTION_SPACE = len(ACTIONS)
 
 
@@ -105,7 +108,7 @@ def get_coupling_map():
     coupling_map = set()
     for i in range(N - 1):
         coupling_map.add((i, i + 1))
-    return coupling_map
+    return list(coupling_map)
 
 
 # Function to generate a matrix from coupling_map
@@ -122,15 +125,33 @@ def get_coupling_map_mat(coupling_map):
 
 
 # Function to get valid actions
-def get_valid_actions(coupling_map):
+def get_valid_actions(state=None, prev_action=None):
     """
     Retrieves a list of possible actions (column pairs) from coupling_map.
     """
-    return list(coupling_map)
+    if state is None:
+        return list(range(ACTION_SPACE))
+    valid_actions = [
+        action
+        for action in range(ACTION_SPACE)
+        if is_valid_action(state, action, prev_action)
+    ]
+    if not valid_actions:
+        return list(range(ACTION_SPACE))
+    return list(valid_actions)
+
+
+def is_valid_action(state, action, prev_action):
+    col1, col2 = coupling_map[action]
+    if np.all(state[:, col1] == 0) and np.all(state[:, col2] == 0):
+        return False
+    if action == prev_action:
+        return False
+    return True
 
 
 # Function to update the state
-def step(mat, action, mcts_policy=None):
+def step(mat, action, prev_action, mcts_policy=None):
     """
     Generates a new state based on the current matrix `mat` and the selected action `action`.
     Also calculates the score according to the action.
@@ -144,24 +165,36 @@ def step(mat, action, mcts_policy=None):
     - action_score: Points gained in this step
     - done: Boolean indicating if the game is finished
     """
+    try:
+        assert action in get_valid_actions(mat, prev_action)
+    except:
+        print(action)
+        print(mat)
+        print(prev_action)
+        print(get_valid_actions(mat, prev_action))
+        assert action in get_valid_actions(mat, prev_action)
+        return
     global used_columns_set
     global used_pair
     col1, col2 = ACTIONS[action]
     if col1 > col2:
-        col1,col2 = col2, col1
-    while (
-        mcts_policy is not None
-        and ((np.all(mat[:, col1] == 0) and np.all(mat[:, col2] == 0))
-        or (used_pair and (col1, col2) == used_pair[-1]))
-    ):
-        action = np.random.choice(range(ACTION_SPACE), p=mcts_policy)
-        col1, col2 = ACTIONS[action]
-        print(mcts_policy)
-        print(col1,col2)
-        # print(col1,col2)
+        col1, col2 = col2, col1
+    if is_done(mat):
+        return mat, True
+    # while (
+    #     mcts_policy is not None
+    #     and ((np.all(mat[:, col1] == 0) and np.all(mat[:, col2] == 0))
+    #     or (used_pair and (col1, col2) == used_pair[-1]))
+    # ):
+    #     print(mat)
+    #     action = np.random.choice(range(ACTION_SPACE), p=mcts_policy)
+    #     col1, col2 = ACTIONS[action]
+    #     print(mcts_policy)
+    #     print(col1,col2)
+    #     # print(col1,col2)
 
+    # used_pair.append((col1,col2))
     new_mat = mat.copy()
-    used_pair.append((col1,col2))
     # Swap columns
     new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
     new_mat[[col1, col2], :] = new_mat[[col2, col1], :]
@@ -169,13 +202,14 @@ def step(mat, action, mcts_policy=None):
     new_mat = new_mat - np.multiply(new_mat, coupling_map_mat)
     new_mat = np.clip(new_mat, 0, 1)  # Prevent elements from becoming negative
     # Calculate the score
-    action_score = a
+    action_score = 0
+    # action_score = a
     if col1 in used_columns_set or col2 in used_columns_set:
-        action_score += b
+        # action_score += b
         used_columns_set.clear()
     used_columns_set.update([col1, col2])
     done = is_done(new_mat)
-    return new_mat, action_score, done
+    return new_mat, done
 
 
 # Function to check if the game is finished
@@ -205,11 +239,11 @@ def get_reward(mat, total_score):
     if is_done(mat):
         # If the game is finished, give a high positive reward
         # reward = 100 - total_score  # ゲームクリア時の報酬から合計スコアを引く
-        reward = 5
+        reward = 1
     else:
         # Game not finished yet
         # reward = -total_score  # 現在の合計スコアの負の値
-        reward = -5
+        reward = 0
     return reward
 
 
