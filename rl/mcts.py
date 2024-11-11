@@ -39,8 +39,8 @@ class MCTS:
             map(str, state.astype(int).flatten().tolist())
         )
         self.initial_tau = 1.0  # 初期の温度パラメータ
-        self.final_tau = 0.01  # 最終的な温度パラメータ
-        self.tau_decay_steps = 20  # 温度パラメータを減衰させるエピソード数
+        self.final_tau = 0.1  # 最終的な温度パラメータ
+        self.tau_decay_steps = 100  # 温度パラメータを減衰させるエピソード数
         self.current_episode = 0
 
     def update_temperature(self):
@@ -99,7 +99,7 @@ class MCTS:
         visits = np.array([self.N[s][a] for a in range(game.ACTION_SPACE)])
         mcts_policy = np.power(visits, 1 / tau)
         mcts_policy /= np.sum(mcts_policy)  # 正規化して確率分布に
-        print(f"Scores: {scores}")
+
         return mcts_policy
 
     def _expand(self, state, prev_action):
