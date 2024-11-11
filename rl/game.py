@@ -171,7 +171,7 @@ def step(mat, action, prev_action, mcts_policy=None):
         print(action,prev_action)
         print(mat)
         print(get_valid_actions(mat, prev_action))
-        action = np.random(get_valid_actions(mat,prev_action))
+        action = np.random.choice(get_valid_actions(mat,prev_action))
     global used_columns_set
     global used_pair
     col1, col2 = ACTIONS[action]
