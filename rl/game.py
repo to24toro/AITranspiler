@@ -178,7 +178,7 @@ def step(mat, action, prev_action, mcts_policy=None):
     if col1 > col2:
         col1, col2 = col2, col1
     if is_done(mat):
-        return mat, True
+        return mat, True, 0
     # while (
     #     mcts_policy is not None
     #     and ((np.all(mat[:, col1] == 0) and np.all(mat[:, col2] == 0))
@@ -200,14 +200,14 @@ def step(mat, action, prev_action, mcts_policy=None):
     new_mat = new_mat - np.multiply(new_mat, coupling_map_mat)
     new_mat = np.clip(new_mat, 0, 1)  # Prevent elements from becoming negative
     # Calculate the score
-    action_score = 0
-    # action_score = a
+    # action_score = 0
+    action_score = a
     if col1 in used_columns_set or col2 in used_columns_set:
         # action_score += b
         used_columns_set.clear()
     used_columns_set.update([col1, col2])
     done = is_done(new_mat)
-    return new_mat, done
+    return new_mat, done, action_score
 
 
 # Function to check if the game is finished
@@ -237,11 +237,11 @@ def get_reward(mat, total_score):
     if is_done(mat):
         # If the game is finished, give a high positive reward
         # reward = 100 - total_score  # ゲームクリア時の報酬から合計スコアを引く
-        reward = 1
+        reward = 1 - total_score
     else:
         # Game not finished yet
-        # reward = -total_score  # 現在の合計スコアの負の値
-        reward = 0
+        reward = -total_score  # 現在の合計スコアの負の値
+        # reward = 0
     return reward
 
 
