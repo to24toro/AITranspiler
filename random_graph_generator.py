@@ -33,11 +33,19 @@ class RandomGraphGenerator:
         self.num_nodes = num_nodes
 
     def generate_random_graph(self):
+        upper_triangle = np.triu(
+            np.random.randint(0, 2, size=(self.num_nodes, self.num_nodes)), k=1
+        )
+        symmetric_matrix = upper_triangle + upper_triangle.T
+        np.fill_diagonal(symmetric_matrix, 0)
+        return nx.from_numpy_array(symmetric_matrix)
+
+    def generate_random_regular_graph(self, d=3):
         """
         Generates a random graph based on the number of nodes.
         Ensures that the graph is connected and undirected.
         """
-        graph = nx.random_regular_graph(d=3, n=self.num_nodes)
+        graph = nx.random_regular_graph(d=d, n=self.num_nodes)
         return graph
 
     def get_adjacency_matrix(self, graph):
@@ -61,8 +69,9 @@ class RandomGraphGenerator:
         """
         Saves the adjacency matrices to files.
         """
+        N = matrices[0].shape[0]
         os.makedirs("graphs", exist_ok=True)
         for i, matrix in enumerate(matrices):
-            file_name = f"graphs/{file_prefix}_{i+1}.npy"
+            file_name = f"graphs/{file_prefix}_{N}_{i+1}.npy"
             np.save(file_name, matrix)
             print(f"Adjacency matrix saved to {file_name}")
