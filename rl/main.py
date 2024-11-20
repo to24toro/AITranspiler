@@ -58,7 +58,7 @@ def selfplay(weights, test=False):
         )
         action = np.random.choice(range(game.ACTION_SPACE), p=mcts_policy)
         record.append(Sample(state.copy(), mcts_policy, reward=None))
-        state, done,action_score = game.step(state, action, prev_action, mcts_policy)
+        state, done, action_score = game.step(state, action, prev_action, mcts_policy)
         prev_action = action
         total_score += action_score
         step_count += 1
