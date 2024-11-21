@@ -30,13 +30,13 @@ class Sample:
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
-def selfplay(weights, test=False):
+def selfplay(weights,qubits, test=False):
     """Perform a self-play game and collect training data."""
     record = []
     if test:
         state = game.get_initial_test_state()
     else:
-        state = game.get_initial_state()
+        state = game.get_initial_state(qubits)
     game.reset_used_columns()
     network = ResNet(action_space=game.ACTION_SPACE)
 
@@ -91,12 +91,12 @@ def main(test=False):
         shutil.rmtree(logdir)
     summary_writer = tf.summary.create_file_writer(str(logdir))
 
-    game.initialize_game()  # Initialize game variables
+    game.initialize_game(qubits)  # Initialize game variables
 
     network = ResNet(action_space=game.ACTION_SPACE)
 
     # Initialize network parameters
-    dummy_state = game.encode_state(game.get_initial_state())
+    dummy_state = game.encode_state(game.get_initial_state(qubits))
     network.predict(dummy_state)
 
     current_weights = ray.put(network.get_weights())

@@ -10,7 +10,6 @@ with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 game_settings = config["game_settings"]
-N = game_settings["N"]  # Size of the matrix (N x N  matrix)
 a = game_settings[
     "a"
 ]  # Points for each action (added each time a column pair is selected)
@@ -48,10 +47,10 @@ Scoring:
 
 
 # Initialize the coupling map and related variables
-def initialize_game():
+def initialize_game(qubits):
     global coupling_map, coupling_map_mat, ACTIONS, ACTION_SPACE
-    coupling_map = get_coupling_map()
-    coupling_map_mat = get_coupling_map_mat(coupling_map)
+    coupling_map = get_coupling_map(qubits)
+    coupling_map_mat = get_coupling_map_mat(coupling_map,qubits)
     ACTIONS = coupling_map
     # ACTIONS = list(get_valid_actions(state=None,prev_action=None))
     ACTION_SPACE = len(ACTIONS)
@@ -64,20 +63,20 @@ def reset_used_columns():
     used_pair = deque()
 
 
-def _generate_binary_symmetric_matrix():
-    upper_triangle = np.triu(np.random.randint(0, 2, size=(N, N)), k=1)
+def _generate_binary_symmetric_matrix(qubits):
+    upper_triangle = np.triu(np.random.randint(0, 2, size=(qubits, qubits)), k=1)
     symmetric_matrix = upper_triangle + upper_triangle.T
     np.fill_diagonal(symmetric_matrix, 0)
     return symmetric_matrix
 
 
 # Function to initialize an  matrix
-def get_initial_state():
+def get_initial_state(qubits):
     """
     Generates an N x N  matrix consisting of random 0s and 1s.
     """
 
-    mat = _generate_binary_symmetric_matrix()
+    mat = _generate_binary_symmetric_matrix(qubits)
     mat = mat - np.multiply(mat, coupling_map_mat)
     return mat
 
@@ -100,24 +99,24 @@ def get_initial_test_state():
 
 
 # Function to generate coupling_map
-def get_coupling_map():
+def get_coupling_map(qubits):
     """
     Generates a set of possible column pairs.
     Here, we use all adjacent column pairs as an example.
     """
     coupling_map = set()
-    for i in range(N - 1):
+    for i in range(qubits - 1):
         coupling_map.add((i, i + 1))
     return list(coupling_map)
 
 
 # Function to generate a matrix from coupling_map
-def get_coupling_map_mat(coupling_map):
+def get_coupling_map_mat(coupling_map,qubits):
     """
     Generates an  matrix from coupling_map.
     For each column pair (i, j) in coupling_map, sets the position (i, j) in the matrix to 1.
     """
-    coupling_map_mat = np.zeros((N, N))
+    coupling_map_mat = np.zeros((qubits, qubits))
     for i, j in coupling_map:
         coupling_map_mat[i, j] = 1
         coupling_map_mat[j, i] = 1
@@ -203,7 +202,7 @@ def step(mat, action, prev_action, mcts_policy=None):
     # action_score = 0
     action_score = a
     if col1 in used_columns_set or col2 in used_columns_set:
-        # action_score += b
+        action_score += b
         used_columns_set.clear()
     used_columns_set.update([col1, col2])
     done = is_done(new_mat)
@@ -246,7 +245,7 @@ def get_reward(mat, total_score):
 
 
 # Function to encode the state for neural network input
-def encode_state(mat):
+def encode_state(mat,qubits):
     """
     Encodes the state matrix into a format suitable for neural network input.
 
@@ -257,7 +256,7 @@ def encode_state(mat):
     - encoded_state: A numpy array suitable for network input
     """
     # Reshape to (N, N, 1) and normalize if necessary
-    encoded_state = mat.reshape(N, N, 1).astype(np.float32)
+    encoded_state = mat.reshape(qubits,qubits, 1).astype(np.float32)
     return encoded_state
 
 
@@ -281,5 +280,5 @@ def save_state(mat, step_num):
     print(f"State at step {step_num} saved to {filename}")
 
 
-# Initialize game variables
-initialize_game()
+# # Initialize game variables
+# initialize_game(qubits)

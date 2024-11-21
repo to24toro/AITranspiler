@@ -33,12 +33,12 @@ class RandomGraphGenerator:
         self.num_nodes = num_nodes
 
     def generate_random_graph(self):
-        upper_triangle = np.triu(
-            np.random.randint(0, 2, size=(self.num_nodes, self.num_nodes)), k=1
-        )
-        symmetric_matrix = upper_triangle + upper_triangle.T
-        np.fill_diagonal(symmetric_matrix, 0)
-        return nx.from_numpy_array(symmetric_matrix)
+        for i in range(1000):
+            graph = nx.erdos_renyi_graph(self.num_nodes, 0.3)
+            if nx.is_connected(graph):
+                break
+            # seed += 1
+        return graph
 
     def generate_random_regular_graph(self, d=3):
         """

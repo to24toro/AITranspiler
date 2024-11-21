@@ -15,7 +15,8 @@ mcts_settings = config["mcts_settings"]
 
 
 class MCTS:
-    def __init__(self, network):
+    def __init__(self,qubits, network):
+        self.qubits = qubits
         self.network = network
         self.alpha = mcts_settings["dirichlet_alpha"]
         self.c_puct = mcts_settings["c_puct"]
@@ -106,7 +107,7 @@ class MCTS:
         s = self.state_to_str(state)
 
         with tf.device("/cpu:0"):
-            nn_policy, nn_value = self.network.predict(game.encode_state(state))
+            nn_policy, nn_value = self.network.predict(game.encode_state(state,self.qubits))
 
         nn_policy = nn_policy.numpy().tolist()[0]
         nn_value = nn_value.numpy()[0][0]
