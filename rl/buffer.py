@@ -2,7 +2,7 @@ import collections
 
 import numpy as np
 
-from rl import game
+from rl.game import encode_state
 
 
 class ReplayBuffer:
@@ -20,7 +20,9 @@ class ReplayBuffer:
         samples = [self.buffer[idx] for idx in indices]
 
         # Encode states for neural network input
-        states = np.stack([game.encode_state(s.state) for s in samples], axis=0)
+        states = np.stack(
+            [encode_state(s.state, s.state.shape[0]) for s in samples], axis=0
+        )
 
         mcts_policy = np.array([s.mcts_policy for s in samples], dtype=np.float32)
         rewards = np.array([s.reward for s in samples], dtype=np.float32).reshape(-1, 1)

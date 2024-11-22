@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import yaml
 
-from rl import game
+from rl.game import Game, encode_state
 
 # Load MCTS settings from config.yaml
 with open("config.yaml", "r") as f:
@@ -15,7 +15,7 @@ mcts_settings = config["mcts_settings"]
 
 
 class MCTS:
-    def __init__(self,qubits, network):
+    def __init__(self, qubits, network):
         self.qubits = qubits
         self.network = network
         self.alpha = mcts_settings["dirichlet_alpha"]
@@ -39,6 +39,8 @@ class MCTS:
         self.state_to_str = lambda state: "".join(
             map(str, state.astype(int).flatten().tolist())
         )
+
+        self.game = Game(qubits, config)
         self.initial_tau = 1.0  # 初期の温度パラメータ
         self.final_tau = 0.1  # 最終的な温度パラメータ
         self.tau_decay_steps = 100  # 温度パラメータを減衰させるエピソード数
@@ -55,7 +57,7 @@ class MCTS:
         if s not in self.P:
             _ = self._expand(root_state, prev_action)
 
-        valid_actions = game.get_valid_actions(root_state, prev_action)
+        valid_actions = self.game.get_valid_actions(root_state, prev_action)
 
         if self.alpha is not None:
             dirichlet_noise = np.random.dirichlet([self.alpha] * len(valid_actions))
@@ -69,14 +71,14 @@ class MCTS:
                 * self.P[s][a]
                 * math.sqrt(sum(self.N[s]))
                 / (1 + self.N[s][a])
-                for a in range(game.ACTION_SPACE)
+                for a in range(len(self.game.coupling_map))
             ]
             Q = [
                 self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0
-                for a in range(game.ACTION_SPACE)
+                for a in range(len(self.game.coupling_map))
             ]
 
-            assert len(U) == len(Q) == game.ACTION_SPACE
+            assert len(U) == len(Q) == len(self.game.coupling_map)
 
             scores = [u + q for u, q in zip(U, Q)]
 
@@ -97,7 +99,7 @@ class MCTS:
             self.N[s][action] += 1
 
         # MCTSポリシーを温度パラメータで調整
-        visits = np.array([self.N[s][a] for a in range(game.ACTION_SPACE)])
+        visits = np.array([self.N[s][a] for a in range(len(self.game.coupling_map))])
         mcts_policy = np.power(visits, 1 / tau)
         mcts_policy /= np.sum(mcts_policy)  # 正規化して確率分布に
 
@@ -107,24 +109,24 @@ class MCTS:
         s = self.state_to_str(state)
 
         with tf.device("/cpu:0"):
-            nn_policy, nn_value = self.network.predict(game.encode_state(state,self.qubits))
+            nn_policy, nn_value = self.network.predict(encode_state(state, self.qubits))
 
         nn_policy = nn_policy.numpy().tolist()[0]
         nn_value = nn_value.numpy()[0][0]
 
         self.P[s] = nn_policy
-        self.N[s] = [0] * game.ACTION_SPACE
-        self.W[s] = [0] * game.ACTION_SPACE
+        self.N[s] = [0] * len(self.game.coupling_map)
+        self.W[s] = [0] * len(self.game.coupling_map)
 
-        valid_actions = game.get_valid_actions(state, prev_action)
+        valid_actions = self.game.get_valid_actions(state, prev_action)
         #: Cache next states
         self.next_states[s] = [
             (
-                game.step(state, action, prev_action)[0]
+                self.game.step(state, action, prev_action)[0]
                 if (action in valid_actions)
                 else None
             )
-            for action in range(game.ACTION_SPACE)
+            for action in range(len(self.game.coupling_map))
         ]
         return nn_value
 
@@ -136,8 +138,8 @@ class MCTS:
 
         s = self.state_to_str(state)
 
-        if game.is_done(state):
-            reward = game.get_reward(state, total_score)
+        if self.game.is_done(state):
+            reward = self.game.get_reward(state, total_score)
             return reward
 
         elif s not in self.P:
@@ -150,15 +152,15 @@ class MCTS:
                 * self.P[s][a]
                 * math.sqrt(sum(self.N[s]))
                 / (1 + self.N[s][a])
-                for a in range(game.ACTION_SPACE)
+                for a in range(len(self.game.coupling_map))
             ]
             Q = [
                 self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0
-                for a in range(game.ACTION_SPACE)
+                for a in range(len(self.game.coupling_map))
             ]
-            assert len(U) == len(Q) == game.ACTION_SPACE
+            assert len(U) == len(Q) == len(self.game.coupling_map)
 
-            valid_actions = game.get_valid_actions(state, prev_action)
+            valid_actions = self.game.get_valid_actions(state, prev_action)
 
             scores = [u + q for u, q in zip(U, Q)]
             scores = np.array(

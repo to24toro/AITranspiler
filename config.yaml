@@ -20,6 +20,7 @@ network_settings:
 
 training_settings:
   num_cpus: 8
+  num_gpus: 8
   n_episodes: 700
   buffer_size: 700
   batch_size: 64

@@ -30,7 +30,7 @@ class Sample:
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
-def selfplay(weights,qubits, test=False):
+def selfplay(weights, qubits, test=False):
     """Perform a self-play game and collect training data."""
     record = []
     if test:
@@ -76,6 +76,7 @@ def selfplay(weights,qubits, test=False):
 def main(test=False):
     """Main training loop."""
     num_cpus = training_settings["num_cpus"]
+    num_gpus = training_settings["num_gpus"]
     n_episodes = training_settings["n_episodes"]
     buffer_size = training_settings["buffer_size"]
     batch_size = training_settings["batch_size"]
@@ -84,7 +85,7 @@ def main(test=False):
     save_period = training_settings["save_period"]
     os.makedirs("checkpoints", exist_ok=True)
 
-    ray.init(num_cpus=num_cpus, num_gpus=1, local_mode=False)
+    ray.init(num_cpus=num_cpus, num_gpus=num_gpus, local_mode=False)
 
     logdir = Path(__file__).parent / "log"
     if logdir.exists():
