@@ -1,25 +1,28 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.layers as kl
-import yaml
 from tensorflow.keras.activations import relu
 from tensorflow.keras.regularizers import l2
-
-# Load network settings from config.yaml
-with open("config.yaml", "r") as f:
-    config = yaml.safe_load(f)
-
-network_settings = config["network_settings"]
+from typing import List, Tuple, Any
 
 
 class ResNet(tf.keras.Model):
-    def __init__(self, action_space):
+    def __init__(self, action_space: int, config: dict):
+        """
+        Residual Network for policy and value predictions.
+
+        Args:
+            action_space (int): The size of the action space.
+            config (dict): Configuration dictionary containing network settings.
+        """
         super().__init__()
 
         self.action_space = action_space
-        self.n_blocks = network_settings["n_blocks"]
-        self.filters = network_settings["filters"]
-        self.use_bias = network_settings["use_bias"]
+
+        network_settings = config["network_settings"]
+        self.n_blocks: int = network_settings["n_blocks"]
+        self.filters: int = network_settings["filters"]
+        self.use_bias: bool = network_settings["use_bias"]
 
         self.conv1 = kl.Conv2D(
             self.filters,
@@ -31,15 +34,26 @@ class ResNet(tf.keras.Model):
         )
         self.bn1 = kl.BatchNormalization()
 
-        self.policy_layers = self._build_head(2, self.action_space)
-        self.value_layers = self._build_head(1, 1, activation="tanh")
+        self.policy_layers: List[Any] = self._build_head(2, self.action_space)
+        self.value_layers: List[Any] = self._build_head(1, 1, activation="tanh")
 
-        self.res_blocks = [
+        self.res_blocks: List[ResBlock] = [
             ResBlock(filters=self.filters, use_bias=self.use_bias)
             for _ in range(self.n_blocks)
         ]
 
-    def _build_head(self, num_filters, output_dim, activation=None):
+    def _build_head(self, num_filters: int, output_dim: int, activation: str = None) -> List[Any]:
+        """
+        Build the policy or value head.
+
+        Args:
+            num_filters (int): Number of filters for the first convolutional layer.
+            output_dim (int): Dimension of the output layer.
+            activation (str, optional): Activation function for the output layer.
+
+        Returns:
+            List[Any]: List of layers comprising the head.
+        """
         return [
             kl.Conv2D(
                 num_filters,
@@ -58,7 +72,19 @@ class ResNet(tf.keras.Model):
             ),
         ]
 
-    def call(self, inputs, training=False):
+    def call(self, inputs: tf.Tensor, training: bool = False) -> Tuple[tf.Tensor, tf.Tensor]:
+        """
+        Forward pass for the ResNet.
+
+        Args:
+            inputs (tf.Tensor): Input tensor with shape (batch_size, height, width, channels).
+            training (bool): Whether the network is in training mode.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: 
+                - Policy output (probabilities over actions).
+                - Value output (scalar value prediction).
+        """
         x = relu(self.bn1(self.conv1(inputs), training=training))
 
         for res_block in self.res_blocks:
@@ -84,24 +110,48 @@ class ResNet(tf.keras.Model):
 
         return policy_output, value_output
 
-    def predict(self, state):
-        if len(state.shape) == 3:
+    def predict(self, state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Make a prediction using the ResNet model.
+
+        Args:
+            state (np.ndarray): Input state matrix of shape (height, width, channels).
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: 
+                - Policy output as probabilities over actions.
+                - Value output as a scalar.
+        """
+        if len(state.shape) == 3:  # Add batch dimension if missing
             state = state[np.newaxis, ...]
 
         policy, value = self(state)
 
-        return policy, value
+        return policy.numpy(), value.numpy()
 
 
-class ResBlock(tf.keras.layers.Layer):
-    def __init__(self, filters, use_bias):
+class ResBlock(kl.Layer):
+    def __init__(self, filters: int, use_bias: bool):
+        """
+        Residual block with two convolutional layers.
+
+        Args:
+            filters (int): Number of filters for the convolutional layers.
+            use_bias (bool): Whether to use bias in the convolutional layers.
+        """
         super().__init__()
-        self.filters = filters
-        self.use_bias = use_bias
+        self.filters: int = filters
+        self.use_bias: bool = use_bias
 
-        self.conv_layers = self._build_conv_block()
+        self.conv_layers: List[kl.Layer] = self._build_conv_block()
 
-    def _build_conv_block(self):
+    def _build_conv_block(self) -> List[kl.Layer]:
+        """
+        Build the convolutional block for the residual layer.
+
+        Returns:
+            List[kl.Layer]: List of convolutional and batch normalization layers.
+        """
         return [
             kl.Conv2D(
                 self.filters,
@@ -123,12 +173,22 @@ class ResBlock(tf.keras.layers.Layer):
             kl.BatchNormalization(),
         ]
 
-    def call(self, x, training=False):
+    def call(self, x: tf.Tensor, training: bool = False) -> tf.Tensor:
+        """
+        Forward pass for the residual block.
+
+        Args:
+            x (tf.Tensor): Input tensor.
+            training (bool): Whether the network is in training mode.
+
+        Returns:
+            tf.Tensor: Output tensor after applying the residual connection.
+        """
         inputs = x
 
         x = relu(self.conv_layers[1](self.conv_layers[0](x), training=training))
         x = self.conv_layers[3](self.conv_layers[2](x), training=training)
 
-        x = relu(x + inputs)
+        x = relu(x + inputs)  # Residual connection
 
         return x

@@ -1,26 +1,26 @@
 game_settings:
-  N: 10 # Size of the matrix (N x N upper triangular matrix)
-  a: 0.1  # Points for each action (added each time a column pair is selected)
-  b: 6  # Penalty points when reusing columns included in the set. N//2
-  MAX_STEPS: 60 # Maximum number of steps to forcibly end the game. (NC2)**(2N) if 3-正則
+  N: 6 # Size of the matrix (N x N upper triangular matrix)
+  gate: 0.  # Points for each action (added each time a column pair is selected)
+  layer: 0.1  # Penalty points when reusing columns included in the set. N//2
+  MAX_STEPS: 20 # Maximum number of steps to forcibly end the game. (NC2)**(2N) if 3-正則
 
 
 mcts_settings:
-  c_puct: 5
-  epsilon: 0.5
-  dirichlet_alpha: 0.5
-  num_mcts_simulations: 150 # 100以上
-  max_depth: 60 # N * N
+  c_puct: 1
+  epsilon: 0.3
+  dirichlet_alpha: 0.3
+  num_mcts_simulations: 100 # 100以上
+  max_depth: 20 # N * N
 
 network_settings:
-  n_blocks: 20
-  filters: 256
+  n_blocks: 10
+  filters: 128
   use_bias: False
   learning_rate: 0.0004
 
 training_settings:
   num_cpus: 8
-  num_gpus: 8
+  num_gpus: 0
   n_episodes: 700
   buffer_size: 700
   batch_size: 64
