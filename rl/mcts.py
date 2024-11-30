@@ -105,8 +105,8 @@ class MCTS:
     def _expand(self, state, prev_action):
         s = self.state_to_str(state)
 
-        with tf.device("/cpu:0"):
-            nn_policy, nn_value = self.network.predict(game.encode_state(state))
+        # with tf.device("/cpu:0"):
+        nn_policy, nn_value = self.network.predict(game.encode_state(state))
 
         nn_policy = nn_policy.numpy().tolist()[0]
         nn_value = nn_value.numpy()[0][0]
