@@ -122,7 +122,7 @@ class Game:
         if self.is_done(mat):
             reward = 1.0 - total_score
         else:
-            reward = -total_score
+            reward = 0.0
         return reward
 
 
