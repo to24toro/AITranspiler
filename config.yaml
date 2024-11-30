@@ -1,7 +1,7 @@
 game_settings:
   N: 6
-  gate: 0.2  # Penalty for each action
-  layer: 0  # Penalty for reusing columns
+  gate: 0.2        # 各アクションに対するペナルティ
+  layer: 0.1       # カラムの再利用に対するペナルティ（正の値に設定）
   MAX_STEPS: 40
 
 mcts_settings:
@@ -10,6 +10,7 @@ mcts_settings:
   dirichlet_alpha: 0.6
   num_mcts_simulations: 200
   max_depth: 40
+  tau_threshold: 10  # 初期の手数での探索性を制御
 
 network_settings:
   n_blocks: 12
@@ -26,3 +27,4 @@ training_settings:
   epochs_per_update: 50
   update_period: 50
   save_period: 50
+  eval_period: 100  # 評価の頻度を設定
