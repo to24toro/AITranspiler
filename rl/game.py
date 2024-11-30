@@ -17,7 +17,7 @@ Game Procedure:
 5. Repeat steps 2 to 4 until all elements of the matrix `mat` become 0 to clear the game.
 
 Scoring:
-- Add `gate` points for each action (selection of a column pair).
+- Add `gate` penalty points for each action (selection of a column pair).
 - Save the columns used in the action in the set `used_columns_set` and `used_pair`.
 - If a column included in this set is used again in a new action,
   add `layer` penalty points and reset the set to empty.
