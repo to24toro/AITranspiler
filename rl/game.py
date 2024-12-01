@@ -28,6 +28,13 @@ Scoring:
 
 class Game:
     def __init__(self, qubits: int, config: Dict):
+        """
+        Initialize the game with the given number of qubits and configuration.
+
+        :param qubits: Number of qubits to use in the game.
+        :param config: Configuration dictionary containing game settings
+                       such as gate and layer penalties and max steps.
+        """
         self.gate: float = config["game_settings"]["gate"]
         self.layer_penalty: float = config["game_settings"]["layer"]
         self.MAX_STEPS: int = config["game_settings"]["MAX_STEPS"]
@@ -40,9 +47,19 @@ class Game:
         self.current_layer: int = 0
 
     def _generate_coupling_map(self) -> List[Tuple[int, int]]:
+        """
+        Generate a coupling map representing valid column swaps.
+
+        :return: A list of tuples, where each tuple (i, j) represents a valid column swap.
+        """
         return [(i, i + 1) for i in range(self.qubits - 1)]
 
     def _generate_coupling_map_mat(self) -> np.ndarray:
+        """
+        Generate a matrix representing the coupling map for element-wise operations.
+
+        :return: A 2D numpy array of size (qubits x qubits) representing the coupling map.
+        """
         coupling_map_mat = np.zeros((self.qubits, self.qubits))
         for i, j in self.coupling_map:
             coupling_map_mat[i, j] = 1
@@ -50,10 +67,18 @@ class Game:
         return coupling_map_mat
 
     def reset_used_columns(self) -> None:
+        """
+        Reset the set of used columns and increment the current layer count.
+        """
         self.used_columns_set.clear()
         self.current_layer += 1
 
     def get_initial_state(self) -> np.ndarray:
+        """
+        Generate the initial state of the game as an N x N matrix.
+
+        :return: A symmetric 2D numpy array with values initialized based on coupling map.
+        """
         upper_triangle = np.triu(
             np.random.randint(0, 2, size=(self.qubits, self.qubits)), k=1
         )
@@ -65,6 +90,13 @@ class Game:
     def get_valid_actions(
         self, state: Optional[np.ndarray] = None, prev_action: Optional[int] = None
     ) -> List[int]:
+        """
+        Get a list of valid actions (column swaps) given the current state.
+
+        :param state: Current state matrix (optional).
+        :param prev_action: Previous action taken (optional).
+        :return: A list of valid action indices.
+        """
         if state is None:
             return list(range(len(self.coupling_map)))
 
@@ -78,6 +110,14 @@ class Game:
     def is_valid_action(
         self, state: np.ndarray, action: int, prev_action: Optional[int]
     ) -> bool:
+        """
+        Check if a given action is valid in the current state.
+
+        :param state: Current state matrix.
+        :param action: Action to validate (index of coupling map).
+        :param prev_action: Previous action taken.
+        :return: True if the action is valid, otherwise False.
+        """
         col1, col2 = self.coupling_map[action]
         if np.all(state[:, col1] == 0) and np.all(state[:, col2] == 0):
             return False
@@ -88,6 +128,15 @@ class Game:
     def step(
         self, mat: np.ndarray, action: int, prev_action: Optional[int]
     ) -> Tuple[np.ndarray, bool, float]:
+        """
+        Execute an action (column swap), update the state, and calculate the score.
+
+        :param mat: Current state matrix.
+        :param action: Action to execute (index of coupling map).
+        :param prev_action: Previous action taken (optional).
+        :return: A tuple containing the new state matrix, a boolean indicating if
+                 the game is done, and the score for the action.
+        """
         if action not in self.get_valid_actions(mat, prev_action):
             action = np.random.choice(self.get_valid_actions(mat, prev_action))
 
@@ -116,9 +165,22 @@ class Game:
         return new_mat, done, action_score
 
     def is_done(self, mat: np.ndarray) -> bool:
+        """
+        Check if the game is completed (all elements are zero).
+
+        :param mat: Current state matrix.
+        :return: True if the game is done, otherwise False.
+        """
         return np.all(mat == 0)
 
     def get_reward(self, mat: np.ndarray, total_score: float) -> float:
+        """
+        Calculate the reward based on the current state and total score.
+
+        :param mat: Current state matrix.
+        :param total_score: Total accumulated score.
+        :return: Reward value (1.0 - total_score if game is done, else 0.0).
+        """
         if self.is_done(mat):
             reward = 1.0 - total_score
         else:
@@ -127,4 +189,11 @@ class Game:
 
 
 def encode_state(mat: np.ndarray, qubits: int) -> np.ndarray:
+    """
+    Encode the state matrix as a 3D array for use in machine learning models.
+
+    :param mat: State matrix to encode.
+    :param qubits: Number of qubits (used to define dimensions).
+    :return: A reshaped 3D numpy array of the state matrix.
+    """
     return mat.reshape(qubits, qubits, 1).astype(np.float32)

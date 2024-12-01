@@ -6,8 +6,8 @@ networkx
 qiskit
 qiskit_ibm_runtime
 pylatexenc
-tensorflow ==2.17.0
-keras
+tensorflow ==2.16.1
+tf-keras
 ray
 python-sat
 tqdm

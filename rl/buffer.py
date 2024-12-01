@@ -5,6 +5,13 @@ from dataclasses import dataclass
 
 from rl.game import encode_state
 
+
+@dataclass
+class Sample:
+    state: np.ndarray
+    mcts_policy: np.ndarray
+    reward: float
+
 @dataclass
 class Sample:
     state: np.ndarray
@@ -18,7 +25,9 @@ class ReplayBuffer:
     def __len__(self) -> int:
         return len(self.buffer)
 
-    def get_minibatch(self, batch_size: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_minibatch(
+        self, batch_size: int
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         indices = np.random.choice(len(self.buffer), size=batch_size, replace=False)
         samples = [self.buffer[idx] for idx in indices]
 
