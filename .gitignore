@@ -163,4 +163,4 @@ cython_debug/
 
 checkpoints/
 log/
-graphs
+graphs/
