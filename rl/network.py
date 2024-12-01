@@ -6,7 +6,7 @@ import tf_keras as keras
 import tf_keras.layers as kl
 from tf_keras.activations import relu
 from tf_keras.regularizers import l2
-
+os.environ["TF_USE_LEGACY_KERAS"]="1"
 
 class ResNet(keras.Model):
     def __init__(self, action_space: int, config: dict):
@@ -124,16 +124,6 @@ class ResNet(keras.Model):
         policy, value = self(state)
         return policy, value
 
-    def get_config(self):
-        # Serialize the configuration
-        return {
-            "action_space": self.action_space,
-            "network_settings": {
-                "n_blocks": self.n_blocks,
-                "filters": self.filters,
-                "use_bias": self.use_bias,
-            },
-        }
 
 class ResBlock(keras.layers.Layer):
     def __init__(self, filters, use_bias):
@@ -197,14 +187,3 @@ class ResBlock(keras.layers.Layer):
         x = relu(x + inputs)
 
         return x
-
-    def get_config(self):
-        # Serialize the configuration
-        return {
-            "filters": self.filters,
-            "use_bias": self.use_bias,
-        }
-
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
