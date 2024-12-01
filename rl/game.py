@@ -165,13 +165,9 @@ def step(mat, action, prev_action, mcts_policy=None):
     - action_score: Points gained in this step
     - done: Boolean indicating if the game is finished
     """
-    try:
-        assert action in get_valid_actions(mat, prev_action)
-    except:
-        print(action,prev_action)
-        print(mat)
-        print(get_valid_actions(mat, prev_action))
-        action = np.random(get_valid_actions(mat,prev_action))
+    if action not in get_valid_actions(mat, prev_action):
+        action = np.random.choice(get_valid_actions(mat, prev_action))
+
     global used_columns_set
     global used_pair
     col1, col2 = ACTIONS[action]
@@ -237,7 +233,7 @@ def get_reward(mat, total_score):
     if is_done(mat):
         # If the game is finished, give a high positive reward
         # reward = 100 - total_score  # ゲームクリア時の報酬から合計スコアを引く
-        reward = 1
+        reward = 1-total_score
     else:
         # Game not finished yet
         # reward = -total_score  # 現在の合計スコアの負の値

@@ -1,9 +1,13 @@
+import os
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras.layers as kl
+
+import tf_keras as keras
+import tf_keras.layers as kl
 import yaml
-from tensorflow.keras.activations import relu
-from tensorflow.keras.regularizers import l2
+from tf_keras.activations import relu
+from tf_keras.regularizers import l2
+os.environ["TF_USE_LEGACY_KERAS"]="1"
 
 # Load network settings from config.yaml
 with open("config.yaml", "r") as f:
@@ -12,7 +16,7 @@ with open("config.yaml", "r") as f:
 network_settings = config["network_settings"]
 
 
-class ResNet(tf.keras.Model):
+class ResNet(keras.Model):
     def __init__(self, action_space):
         super().__init__()
 
@@ -93,7 +97,7 @@ class ResNet(tf.keras.Model):
         return policy, value
 
 
-class ResBlock(tf.keras.layers.Layer):
+class ResBlock(keras.layers.Layer):
     def __init__(self, filters, use_bias):
         super().__init__()
         self.filters = filters
