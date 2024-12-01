@@ -1,0 +1,28 @@
+game_settings:
+  N: 6
+  a: 0.2  # Penalty for each action
+  b: 2.5  # Penalty for reusing columns
+  MAX_STEPS: 40
+
+mcts_settings:
+  c_puct: 2.0
+  epsilon: 0.4
+  dirichlet_alpha: 0.6
+  num_mcts_simulations: 200
+  max_depth: 40
+
+network_settings:
+  n_blocks: 12
+  filters: 192
+  use_bias: False
+  learning_rate: 0.0006
+
+training_settings:
+  num_cpus: 8
+  num_gpus: 0
+  n_episodes: 1000
+  buffer_size: 1500
+  batch_size: 128
+  epochs_per_update: 30
+  update_period: 30
+  save_period: 50

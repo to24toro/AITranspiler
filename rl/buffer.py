@@ -12,6 +12,11 @@ class Sample:
     mcts_policy: np.ndarray
     reward: float
 
+@dataclass
+class Sample:
+    state: np.ndarray
+    mcts_policy: np.ndarray
+    reward: float
 
 class ReplayBuffer:
     def __init__(self, buffer_size: int):

@@ -14,10 +14,10 @@ mcts_settings:
   tau_threshold: 10
 
 network_settings:
-  n_blocks: 20
-  filters: 256
+  n_blocks: 12
+  filters: 192
   use_bias: False
-  learning_rate: 0.0004
+  learning_rate: 0.0006
 
 training_settings:
   num_cpus: 8

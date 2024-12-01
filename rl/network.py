@@ -17,7 +17,6 @@ class ResNet(keras.Model):
         :param config: Configuration dictionary containing network settings.
         """
         super().__init__()
-
         self.action_space = action_space
 
         network_settings = config["network_settings"]
@@ -125,6 +124,16 @@ class ResNet(keras.Model):
         policy, value = self(state)
         return policy, value
 
+    def get_config(self):
+        # Serialize the configuration
+        return {
+            "action_space": self.action_space,
+            "network_settings": {
+                "n_blocks": self.n_blocks,
+                "filters": self.filters,
+                "use_bias": self.use_bias,
+            },
+        }
 
 class ResBlock(keras.layers.Layer):
     def __init__(self, filters, use_bias):
@@ -188,3 +197,14 @@ class ResBlock(keras.layers.Layer):
         x = relu(x + inputs)
 
         return x
+
+    def get_config(self):
+        # Serialize the configuration
+        return {
+            "filters": self.filters,
+            "use_bias": self.use_bias,
+        }
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

@@ -67,6 +67,7 @@ class MCTS:
         decay_factor = min(1, self.current_episode / self.tau_decay_steps)
         return self.initial_tau * (1 - decay_factor) + self.final_tau * decay_factor
 
+
     def search(self, root_state, num_simulations, prev_action):
         """
         Perform MCTS simulations starting from the root state.
@@ -132,6 +133,7 @@ class MCTS:
         mcts_policy /= np.sum(mcts_policy)
 
         return mcts_policy
+
 
     def _expand(self, state, prev_action):
         """
