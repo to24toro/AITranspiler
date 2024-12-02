@@ -7,7 +7,7 @@ qiskit
 qiskit_ibm_runtime
 pylatexenc
 tensorflow ==2.16.1
-tf-keras
+tf-keras == 2.16.0
 ray
 python-sat
 tqdm
