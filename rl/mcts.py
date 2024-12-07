@@ -98,14 +98,14 @@ class MCTS:
                 * self.P[s][a]
                 * math.sqrt(sum(self.N[s]))
                 / (1 + self.N[s][a])
-                for a in range(len(self.game.coupling_map))
+                for a in range(self.game.action_space)
             ]
             Q = [
                 self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0
-                for a in range(len(self.game.coupling_map))
+                for a in range(self.game.action_space)
             ]
 
-            assert len(U) == len(Q) == len(self.game.coupling_map)
+            assert len(U) == len(Q) == self.game.action_space
 
             scores = [u + q for u, q in zip(U, Q)]
 
@@ -128,7 +128,7 @@ class MCTS:
             self.N[s][action] += 1
 
         # Compute the policy distribution based on visit counts.
-        visits = np.array([self.N[s][a] for a in range(len(self.game.coupling_map))])
+        visits = np.array([self.N[s][a] for a in range(self.game.action_space)])
         mcts_policy = np.power(visits, 1 / tau)
         mcts_policy /= np.sum(mcts_policy)
 
@@ -151,8 +151,8 @@ class MCTS:
         nn_value = nn_value.numpy()[0][0]
 
         self.P[s] = nn_policy
-        self.N[s] = [0] * len(self.game.coupling_map)
-        self.W[s] = [0] * len(self.game.coupling_map)
+        self.N[s] = [0] * self.game.action_space
+        self.W[s] = [0] * self.game.action_space
 
         valid_actions = self.game.get_valid_actions(state, prev_action)
         self.next_states[s] = [
@@ -161,7 +161,7 @@ class MCTS:
                 if (action in valid_actions)
                 else None
             )
-            for action in range(len(self.game.coupling_map))
+            for action in range(self.game.action_space)
         ]
         return nn_value
 
@@ -198,13 +198,13 @@ class MCTS:
                 * self.P[s][a]
                 * math.sqrt(sum(self.N[s]))
                 / (1 + self.N[s][a])
-                for a in range(len(self.game.coupling_map))
+                for a in range(self.game.action_space)
             ]
             Q = [
                 self.W[s][a] / self.N[s][a] if self.N[s][a] != 0 else 0
-                for a in range(len(self.game.coupling_map))
+                for a in range(self.game.action_space)
             ]
-            assert len(U) == len(Q) == len(self.game.coupling_map)
+            assert len(U) == len(Q) == self.game.action_space
 
             valid_actions = self.game.get_valid_actions(state, prev_action)
 

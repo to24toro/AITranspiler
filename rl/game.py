@@ -45,6 +45,7 @@ class Game:
         self.state: np.ndarray = self.get_initial_state()
         self.used_columns_set: set = set()
         self.current_layer: int = 0
+        self.action_space = len(self.coupling_map) + 2
 
     def _generate_coupling_map(self) -> List[Tuple[int, int]]:
         """
@@ -98,14 +99,14 @@ class Game:
         :return: A list of valid action indices.
         """
         if state is None:
-            return list(range(len(self.coupling_map)))
+            return list(range(self.action_space))
 
         valid_actions = [
             action
-            for action in range(len(self.coupling_map))
+            for action in range(self.action_space)
             if self.is_valid_action(state, action, prev_action)
         ]
-        return valid_actions if valid_actions else list(range(len(self.coupling_map)))
+        return valid_actions if valid_actions else list(range(self.action_space))
 
     def is_valid_action(
         self, state: np.ndarray, action: int, prev_action: Optional[int]
@@ -118,6 +119,10 @@ class Game:
         :param prev_action: Previous action taken.
         :return: True if the action is valid, otherwise False.
         """
+        if action >= len(self.coupling_map):
+            if action == prev_action:
+                return False
+            return True
         col1, col2 = self.coupling_map[action]
         if np.all(state[:, col1] == 0) and np.all(state[:, col2] == 0):
             return False
@@ -140,27 +145,39 @@ class Game:
         if action not in self.get_valid_actions(mat, prev_action):
             action = np.random.choice(self.get_valid_actions(mat, prev_action))
 
-        col1, col2 = self.coupling_map[action]
-        if col1 > col2:
-            col1, col2 = col2, col1
-
         if self.is_done(mat):
             return mat, True, 0.0
+        if action < len(self.coupling_map):
+            col1, col2 = self.coupling_map[action]
+            if col1 > col2:
+                col1, col2 = col2, col1
 
-        new_mat = mat.copy()
-        new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
-        new_mat[[col1, col2], :] = new_mat[[col2, col1], :]
-        new_mat = new_mat - np.multiply(new_mat, self.coupling_map_mat)
-        new_mat = np.clip(new_mat, 0, 1)
 
-        action_score = self.gate
+            new_mat = mat.copy()
+            new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
+            new_mat[[col1, col2], :] = new_mat[[col2, col1], :]
+            new_mat = new_mat - np.multiply(new_mat, self.coupling_map_mat)
+            new_mat = np.clip(new_mat, 0, 1)
 
-        if col1 in self.used_columns_set or col2 in self.used_columns_set:
-            self.reset_used_columns()
-            action_score += self.layer_penalty
+            action_score = self.gate
 
-        self.used_columns_set.update([col1, col2])
+            if col1 in self.used_columns_set or col2 in self.used_columns_set:
+                self.reset_used_columns()
+                action_score += self.layer_penalty
 
+            self.used_columns_set.update([col1, col2])
+
+        else:
+            for col1,col2 in self.coupling_map[action%2::2]:
+                if col1 > col2:
+                    col1,col2 = col2,col1
+                new_mat = mat.copy()
+                new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
+                new_mat[[col1, col2], :] = new_mat[[col2, col1], :]
+                new_mat = new_mat - np.multiply(new_mat, self.coupling_map_mat)
+                new_mat = np.clip(new_mat, 0, 1)   
+            action_score = self.layer_penalty
+                
         done = self.is_done(new_mat)
         return new_mat, done, action_score
 
