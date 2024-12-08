@@ -1,30 +1,30 @@
 game_settings:
   N: 8
-  gate: 0.001
+  gate: 0
   layer: 0.01
-  MAX_STEPS: 35
+  MAX_STEPS: 20
 
 mcts_settings:
-  c_puct: 5
-  epsilon: 0.6
-  dirichlet_alpha: 0.6
+  c_puct: 4
+  epsilon: 0.5
+  dirichlet_alpha: 0.5
   num_mcts_simulations: 150
-  max_depth: 35
+  max_depth: 20
   tau_threshold: 10
 
 network_settings:
   n_blocks: 24
-  filters: 256
+  filters: 128
   use_bias: False
   learning_rate: 0.0005
 
 training_settings:
   num_cpus: 0
   num_gpus: 1  
-  n_episodes: 200
-  buffer_size: 700
+  n_episodes: 100
+  buffer_size: 1000
   batch_size: 64
-  epochs_per_update: 50
-  update_period: 50
-  save_period: 50
-  eval_period: 50
+  epochs_per_update: 20
+  update_period: 20
+  save_period: 20
+  eval_period: 20

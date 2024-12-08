@@ -44,7 +44,7 @@ class Game:
         self.coupling_map_mat: np.ndarray = self._generate_coupling_map_mat()
         self.state: np.ndarray = self.get_initial_state()
         self.used_columns_set: set = set()
-        self.current_layer: int = 0
+        self.current_layer: int = 1
         self.action_space = len(self.coupling_map) + 2
 
     def _generate_coupling_map(self) -> List[Tuple[int, int]]:
@@ -178,9 +178,8 @@ class Game:
                 new_mat = new_mat - np.multiply(new_mat, self.coupling_map_mat)
                 new_mat = np.clip(new_mat, 0, 1)
                 action_score += self.gate
-                if col1 in self.used_columns_set or col2 in self.used_columns_set:
-                    self.reset_used_columns()
-                    action_score += self.layer_penalty
+            self.reset_used_columns()
+            action_score += self.layer_penalty
                 
         done = self.is_done(new_mat)
         return new_mat, done, action_score
