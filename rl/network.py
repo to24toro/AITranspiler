@@ -67,6 +67,7 @@ class ResNet(keras.Model):
                 kernel_initializer="he_normal",
             ),
             kl.BatchNormalization(),
+            kl.Dropout(0.3),
             kl.Flatten(),
             kl.Dense(
                 output_dim,

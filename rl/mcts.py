@@ -90,6 +90,7 @@ class MCTS:
             dirichlet_noise = np.random.dirichlet([self.alpha] * len(valid_actions))
             for a, noise in zip(valid_actions, dirichlet_noise):
                 self.P[s][a] = (1 - self.epsilon) * self.P[s][a] + self.epsilon * noise
+            self.P[s] /= np.sum(self.P[s])
 
         for _ in range(num_simulations):
             # Calculate U and Q values for all actions.
