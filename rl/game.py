@@ -147,19 +147,21 @@ class Game:
 
         if self.is_done(mat):
             return mat, True, 0.0
+        action_score = 0
+        new_mat = mat.copy()
+
         if action < len(self.coupling_map):
             col1, col2 = self.coupling_map[action]
             if col1 > col2:
                 col1, col2 = col2, col1
 
 
-            new_mat = mat.copy()
             new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
             new_mat[[col1, col2], :] = new_mat[[col2, col1], :]
             new_mat = new_mat - np.multiply(new_mat, self.coupling_map_mat)
             new_mat = np.clip(new_mat, 0, 1)
 
-            action_score = self.gate
+            action_score += self.gate
 
             if col1 in self.used_columns_set or col2 in self.used_columns_set:
                 self.reset_used_columns()
@@ -171,12 +173,14 @@ class Game:
             for col1,col2 in self.coupling_map[action%2::2]:
                 if col1 > col2:
                     col1,col2 = col2,col1
-                new_mat = mat.copy()
                 new_mat[:, [col1, col2]] = new_mat[:, [col2, col1]]
                 new_mat[[col1, col2], :] = new_mat[[col2, col1], :]
                 new_mat = new_mat - np.multiply(new_mat, self.coupling_map_mat)
-                new_mat = np.clip(new_mat, 0, 1)   
-            action_score = self.layer_penalty
+                new_mat = np.clip(new_mat, 0, 1)
+                action_score += self.gate
+                if col1 in self.used_columns_set or col2 in self.used_columns_set:
+                    self.reset_used_columns()
+                    action_score += self.layer_penalty
                 
         done = self.is_done(new_mat)
         return new_mat, done, action_score
