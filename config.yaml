@@ -1,6 +1,6 @@
 game_settings:
   N: 8
-  gate: 0.
+  gate: 0.005
   layer: 0.
   MAX_STEPS: 25
 
