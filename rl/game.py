@@ -45,7 +45,7 @@ class Game:
         self.state: np.ndarray = self.get_initial_state()
         self.used_columns_set: set = set()
         self.current_layer: int = 1
-        self.action_space = len(self.coupling_map) + 2
+        self.action_space = len(self.coupling_map)
 
     def _generate_coupling_map(self) -> List[Tuple[int, int]]:
         """
