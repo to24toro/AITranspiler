@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from typing import List, Tuple
 
 import numpy as np
-
-from rl.game import encode_state
+import torch
 
 
 @dataclass
@@ -28,7 +27,8 @@ class ReplayBuffer:
         samples = [self.buffer[idx] for idx in indices]
 
         states = np.stack(
-            [encode_state(s.state, s.state.shape[0]) for s in samples], axis=0
+            [torch.tensor(s.state, dtype=torch.float32)
+                .unsqueeze(0) for s in samples], axis=0
         )
 
         mcts_policy = np.array([s.mcts_policy for s in samples], dtype=np.float32)

@@ -6,10 +6,9 @@ networkx
 qiskit
 qiskit_ibm_runtime
 pylatexenc
-tensorflow ==2.16.1
-tf-keras == 2.16.0
 keras2onnx
 onnx
-ray
+tensorboard >=2.4.1
 python-sat
+torch
 tqdm

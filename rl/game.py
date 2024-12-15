@@ -206,13 +206,3 @@ class Game:
             reward = -1.0
         return reward
 
-
-def encode_state(mat: np.ndarray, qubits: int) -> np.ndarray:
-    """
-    Encode the state matrix as a 3D array for use in machine learning models.
-
-    :param mat: State matrix to encode.
-    :param qubits: Number of qubits (used to define dimensions).
-    :return: A reshaped 3D numpy array of the state matrix.
-    """
-    return mat.reshape(qubits, qubits, 1).astype(np.float32)

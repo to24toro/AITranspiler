@@ -5,7 +5,8 @@ from typing import Callable, Dict
 import numpy as np
 import tf_keras as keras
 
-from rl.game import Game, encode_state
+from rl.game import Game
+
 
 class MCTS:
     def __init__(self, qubits: int, network: keras.Model, config: Dict):
@@ -135,7 +136,7 @@ class MCTS:
         """
         s = self.state_to_str(state)
 
-        nn_policy, nn_value = self.network.predict(encode_state(state, self.qubits))
+        nn_policy, nn_value = self.network.predict(state)
 
         nn_policy = nn_policy.numpy()[0]
         nn_value = nn_value.numpy()[0][0]
