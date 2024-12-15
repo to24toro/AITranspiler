@@ -8,183 +8,186 @@ from tf_keras.activations import relu
 from tf_keras.regularizers import l2
 os.environ["TF_USE_LEGACY_KERAS"]="1"
 
+
+class SqueezeExciteBlock(kl.Layer):
+    """
+    Squeeze and Excitation block to enhance representational power.
+    """
+    def __init__(self, filters, reduction=4):
+        super().__init__()
+        self.filters = filters
+        self.reduction = reduction
+        self.global_pool = kl.GlobalAveragePooling2D()
+        self.fc1 = kl.Dense(filters // reduction, activation='relu', kernel_initializer='he_normal')
+        self.fc2 = kl.Dense(filters, activation='sigmoid', kernel_initializer='he_normal')
+
+    def call(self, x, training=False):
+        w = self.global_pool(x)
+        w = self.fc1(w)
+        w = self.fc2(w)
+        w = tf.reshape(w, [-1, 1, 1, self.filters])
+        return x * w
+
+
+class ResBlock(keras.layers.Layer):
+    def __init__(self, filters, use_bias, use_se=False, reduction=4):
+        super().__init__()
+        self.filters = filters
+        self.use_bias = use_bias
+        self.use_se = use_se
+        self.reduction = reduction
+
+        self.conv1 = kl.Conv2D(
+            filters, kernel_size=3, padding="same",
+            use_bias=use_bias, kernel_regularizer=l2(0.001),
+            kernel_initializer="he_normal"
+        )
+        self.bn1 = kl.BatchNormalization()
+
+        self.conv2 = kl.Conv2D(
+            filters, kernel_size=3, padding="same",
+            use_bias=use_bias, kernel_regularizer=l2(0.001),
+            kernel_initializer="he_normal"
+        )
+        self.bn2 = kl.BatchNormalization()
+
+        if use_se:
+            self.se_block = SqueezeExciteBlock(filters, reduction=reduction)
+
+    def call(self, x, training=False):
+        inputs = x
+        x = relu(self.bn1(self.conv1(x), training=training))
+        x = self.bn2(self.conv2(x), training=training)
+
+        if self.use_se:
+            x = self.se_block(x, training=training)
+
+        x = relu(x + inputs)
+        return x
+
+
 class ResNet(keras.Model):
     def __init__(self, action_space: int, config: dict):
         """
-        Initialize the ResNet model for policy and value prediction.
-
-        :param action_space: Number of possible actions in the game (output size of the policy head).
-        :param config: Configuration dictionary containing network settings.
+        More expressive ResNet model for policy and value prediction.
+        - Increased n_blocks and filters by default
+        - Optional Squeeze-and-Excitation
+        - Deeper policy/value heads with intermediate dense layers
+        - Stronger regularization (L2, optional dropout)
         """
         super().__init__()
         self.action_space = action_space
 
         network_settings = config["network_settings"]
-        self.n_blocks: int = network_settings["n_blocks"]  # Number of residual blocks.
-        self.filters: int = network_settings[
-            "filters"
-        ]  # Number of filters in each convolutional layer.
-        self.use_bias: bool = network_settings[
-            "use_bias"
-        ]  # Whether to use bias in convolutional layers.
+        self.n_blocks: int = network_settings.get("n_blocks", 20)   # defaultさらに増やす
+        self.filters: int = network_settings.get("filters", 256)    # filters数拡大
+        self.use_bias: bool = network_settings.get("use_bias", False)
+        self.use_se: bool = network_settings.get("use_se", True)
+        self.dropout_rate = network_settings.get("dropout_rate", 0.1)  # 少しドロップアウト増やす
+        self.value_hidden_units = network_settings.get("value_hidden_units", 256)  
+        self.policy_hidden_units = network_settings.get("policy_hidden_units", 256)
 
-        # Initial convolutional layer and batch normalization.
+        # Initial convolution + BN
         self.conv1 = kl.Conv2D(
-            self.filters,
-            kernel_size=3,
-            padding="same",
-            use_bias=self.use_bias,
-            kernel_regularizer=l2(0.001),  # L2 regularization for weight decay.
-            kernel_initializer="he_normal",  # He initialization for better convergence.
+            self.filters, kernel_size=3, padding="same", use_bias=self.use_bias,
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
         )
         self.bn1 = kl.BatchNormalization()
 
-        # Policy and value heads.
-        self.policy_layers = self._build_head(2, self.action_space)
-        self.value_layers = self._build_head(1, 1, activation="tanh")
-
-        # Residual blocks.
+        # Residual blocks
         self.res_blocks = [
-            ResBlock(filters=self.filters, use_bias=self.use_bias)
+            ResBlock(filters=self.filters, use_bias=self.use_bias, use_se=self.use_se)
             for _ in range(self.n_blocks)
         ]
 
-    def _build_head(self, num_filters, output_dim, activation=None):
-        """
-        Build the head (policy or value) of the network.
+        # Policy head (強化)
+        # Conv(2 filters)->BN->ReLU->Flatten->Dense(中間層)->ReLU->Dense(action_space)
+        self.policy_conv = kl.Conv2D(
+            2, kernel_size=1, use_bias=self.use_bias,
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+        self.policy_bn = kl.BatchNormalization()
+        self.policy_flat = kl.Flatten()
 
-        :param num_filters: Number of filters in the first convolutional layer.
-        :param output_dim: Number of output units in the dense layer.
-        :param activation: Activation function for the dense layer (optional).
-        :return: A list of layers defining the head.
-        """
-        return [
-            kl.Conv2D(
-                num_filters,
-                kernel_size=1,
-                use_bias=self.use_bias,
-                kernel_regularizer=l2(0.001),
-                kernel_initializer="he_normal",
-            ),
-            kl.BatchNormalization(),
-            kl.Dropout(0.3),
-            kl.Flatten(),
-            kl.Dense(
-                output_dim,
-                activation=activation,
-                kernel_regularizer=l2(0.001),
-                kernel_initializer="he_normal",
-            ),
-        ]
+        self.policy_fc1 = kl.Dense(
+            self.policy_hidden_units, activation='relu',
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+        self.policy_fc2 = kl.Dense(
+            action_space,
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+
+        # Value head (強化)
+        # Conv(1 filter)->BN->ReLU->Flatten->Dense(value_hidden_units,ReLU)->Dense(value_hidden_units//2,ReLU)->Dense(1,tanh)
+        self.value_conv = kl.Conv2D(
+            1, kernel_size=1, use_bias=self.use_bias,
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+        self.value_bn = kl.BatchNormalization()
+        self.value_flat = kl.Flatten()
+        self.value_fc1 = kl.Dense(
+            self.value_hidden_units, activation='relu',
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+        self.value_fc2 = kl.Dense(
+            self.value_hidden_units // 2, activation='relu',
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+        self.value_fc3 = kl.Dense(
+            1, activation='tanh',
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+
+        # Dropout layers if needed
+        if self.dropout_rate > 0:
+            self.policy_dropout1 = kl.Dropout(self.dropout_rate)
+            self.policy_dropout2 = kl.Dropout(self.dropout_rate)
+            self.value_dropout1 = kl.Dropout(self.dropout_rate)
+            self.value_dropout2 = kl.Dropout(self.dropout_rate)
+        else:
+            self.policy_dropout1 = None
+            self.policy_dropout2 = None
+            self.value_dropout1 = None
+            self.value_dropout2 = None
 
     def call(self, inputs, training=False):
-        """
-        Forward pass through the ResNet model.
-
-        :param inputs: Input tensor (state representation).
-        :param training: Whether the model is in training mode (for batch normalization).
-        :return: Policy output (probabilities over actions) and value output (state value).
-        """
-        # Apply initial convolution and residual blocks.
+        # Initial layers
         x = relu(self.bn1(self.conv1(inputs), training=training))
-
+        # Residual layers
         for res_block in self.res_blocks:
             x = res_block(x, training=training)
 
-        # Process the policy head.
-        policy_x = x
-        for layer in self.policy_layers:
-            if isinstance(layer, kl.BatchNormalization):
-                policy_x = layer(policy_x, training=training)
-            else:
-                policy_x = layer(policy_x)
-        policy_output = tf.nn.softmax(policy_x)  # Apply softmax to get probabilities.
+        # Policy head
+        p = self.policy_conv(x)
+        p = self.policy_bn(p, training=training)
+        p = relu(p)
+        p = self.policy_flat(p)
+        if self.policy_dropout1 is not None:
+            p = self.policy_dropout1(p, training=training)
+        p = self.policy_fc1(p)
+        if self.policy_dropout2 is not None:
+            p = self.policy_dropout2(p, training=training)
+        p = self.policy_fc2(p)
+        policy_output = tf.nn.softmax(p)
 
-        # Process the value head.
-        value_x = x
-        for layer in self.value_layers:
-            if isinstance(layer, kl.BatchNormalization):
-                value_x = layer(value_x, training=training)
-            else:
-                value_x = layer(value_x)
-        value_output = value_x
+        # Value head
+        v = self.value_conv(x)
+        v = self.value_bn(v, training=training)
+        v = relu(v)
+        v = self.value_flat(v)
+        if self.value_dropout1 is not None:
+            v = self.value_dropout1(v, training=training)
+        v = self.value_fc1(v)
+        if self.value_dropout2 is not None:
+            v = self.value_dropout2(v, training=training)
+        v = self.value_fc2(v)
+        v = self.value_fc3(v)  # tanh出力
 
-        return policy_output, value_output
+        return policy_output, v
 
     def predict(self, state):
-        """
-        Predict the policy and value for a given state.
-
-        :param state: Input state tensor. Can be a single state or a batch of states.
-        :return: Tuple containing policy (action probabilities) and value (state value).
-        """
         if len(state.shape) == 3:
-            # Add batch dimension if the input is a single state.
             state = state[np.newaxis, ...]
-
-        policy, value = self(state)
+        policy, value = self(state, training=False)
         return policy, value
-
-
-class ResBlock(keras.layers.Layer):
-    def __init__(self, filters, use_bias):
-        """
-        Initialize a residual block.
-
-        :param filters: Number of filters in the convolutional layers.
-        :param use_bias: Whether to use bias in the convolutional layers.
-        """
-        super().__init__()
-        self.filters = filters
-        self.use_bias = use_bias
-
-        # Two convolutional layers with batch normalization.
-        self.conv_layers = self._build_conv_block()
-
-    def _build_conv_block(self):
-        """
-        Build the convolutional layers of the residual block.
-
-        :return: A list of layers defining the residual block.
-        """
-        return [
-            kl.Conv2D(
-                self.filters,
-                kernel_size=3,
-                padding="same",
-                use_bias=self.use_bias,
-                kernel_regularizer=l2(0.001),
-                kernel_initializer="he_normal",
-            ),
-            kl.BatchNormalization(),
-            kl.Conv2D(
-                self.filters,
-                kernel_size=3,
-                padding="same",
-                use_bias=self.use_bias,
-                kernel_regularizer=l2(0.001),
-                kernel_initializer="he_normal",
-            ),
-            kl.BatchNormalization(),
-        ]
-
-    def call(self, x, training=False):
-        """
-        Forward pass through the residual block.
-
-        :param x: Input tensor.
-        :param training: Whether the model is in training mode (for batch normalization).
-        :return: Output tensor after applying the residual block.
-        """
-        inputs = x
-
-        # First convolution and batch normalization with ReLU activation.
-        x = relu(self.conv_layers[1](self.conv_layers[0](x), training=training))
-
-        # Second convolution and batch normalization.
-        x = self.conv_layers[3](self.conv_layers[2](x), training=training)
-
-        # Add the input (residual connection) and apply ReLU.
-        x = relu(x + inputs)
-
-        return x
