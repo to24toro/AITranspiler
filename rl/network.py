@@ -12,7 +12,6 @@ os.environ["TF_USE_LEGACY_KERAS"]="1"
 class SqueezeExciteBlock(kl.Layer):
     """
     Squeeze and Excitation block to enhance representational power.
-    SEブロックはResidual Block内でオプションとして使用。
     """
     def __init__(self, filters, reduction=4):
         super().__init__()
@@ -32,10 +31,6 @@ class SqueezeExciteBlock(kl.Layer):
 
 class ResBlock(keras.layers.Layer):
     def __init__(self, filters, use_bias, use_se=False, reduction=4):
-        """
-        Residual block with optional Squeeze-and-Excitation.
-        Each block: Conv->BN->ReLU->Conv->BN (+SE) and add skip connection.
-        """
         super().__init__()
         self.filters = filters
         self.use_bias = use_bias
@@ -43,22 +38,16 @@ class ResBlock(keras.layers.Layer):
         self.reduction = reduction
 
         self.conv1 = kl.Conv2D(
-            filters,
-            kernel_size=3,
-            padding="same",
-            use_bias=use_bias,
-            kernel_regularizer=l2(0.001),
-            kernel_initializer="he_normal",
+            filters, kernel_size=3, padding="same",
+            use_bias=use_bias, kernel_regularizer=l2(0.001),
+            kernel_initializer="he_normal"
         )
         self.bn1 = kl.BatchNormalization()
 
         self.conv2 = kl.Conv2D(
-            filters,
-            kernel_size=3,
-            padding="same",
-            use_bias=use_bias,
-            kernel_regularizer=l2(0.001),
-            kernel_initializer="he_normal",
+            filters, kernel_size=3, padding="same",
+            use_bias=use_bias, kernel_regularizer=l2(0.001),
+            kernel_initializer="he_normal"
         )
         self.bn2 = kl.BatchNormalization()
 
@@ -80,29 +69,28 @@ class ResBlock(keras.layers.Layer):
 class ResNet(keras.Model):
     def __init__(self, action_space: int, config: dict):
         """
-        ResNet model for policy and value prediction with possible enhancements:
-        - Larger n_blocks, filters for more capacity
-        - Optional Squeeze-and-Excitation blocks
-        - AlphaZero-inspired head architectures
+        More expressive ResNet model for policy and value prediction.
+        - Increased n_blocks and filters by default
+        - Optional Squeeze-and-Excitation
+        - Deeper policy/value heads with intermediate dense layers
+        - Stronger regularization (L2, optional dropout)
         """
         super().__init__()
         self.action_space = action_space
 
         network_settings = config["network_settings"]
-        self.n_blocks: int = network_settings.get("n_blocks", 10)   # Increase as needed
-        self.filters: int = network_settings.get("filters", 128)    # Increase as needed
+        self.n_blocks: int = network_settings.get("n_blocks", 20)   # defaultさらに増やす
+        self.filters: int = network_settings.get("filters", 256)    # filters数拡大
         self.use_bias: bool = network_settings.get("use_bias", False)
-        self.use_se: bool = network_settings.get("use_se", False)
-        self.dropout_rate = network_settings.get("dropout_rate", 0.0)  # Set dropout if needed
+        self.use_se: bool = network_settings.get("use_se", True)
+        self.dropout_rate = network_settings.get("dropout_rate", 0.1)  # 少しドロップアウト増やす
+        self.value_hidden_units = network_settings.get("value_hidden_units", 256)  
+        self.policy_hidden_units = network_settings.get("policy_hidden_units", 256)
 
         # Initial convolution + BN
         self.conv1 = kl.Conv2D(
-            self.filters,
-            kernel_size=3,
-            padding="same",
-            use_bias=self.use_bias,
-            kernel_regularizer=l2(0.001),
-            kernel_initializer="he_normal",
+            self.filters, kernel_size=3, padding="same", use_bias=self.use_bias,
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
         )
         self.bn1 = kl.BatchNormalization()
 
@@ -112,52 +100,56 @@ class ResNet(keras.Model):
             for _ in range(self.n_blocks)
         ]
 
-        # Policy head
-        # AlphaZero style: Conv(2 filters, 1x1) -> BN -> ReLU -> Flatten -> Dense(action_space)
+        # Policy head (強化)
+        # Conv(2 filters)->BN->ReLU->Flatten->Dense(中間層)->ReLU->Dense(action_space)
         self.policy_conv = kl.Conv2D(
-            2, kernel_size=1,
-            use_bias=self.use_bias,
-            kernel_regularizer=l2(0.001),
-            kernel_initializer="he_normal"
+            2, kernel_size=1, use_bias=self.use_bias,
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
         )
         self.policy_bn = kl.BatchNormalization()
         self.policy_flat = kl.Flatten()
-        self.policy_dense = kl.Dense(
-            self.action_space,
-            kernel_regularizer=l2(0.001),
-            kernel_initializer="he_normal"
+
+        self.policy_fc1 = kl.Dense(
+            self.policy_hidden_units, activation='relu',
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+        self.policy_fc2 = kl.Dense(
+            action_space,
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
         )
 
-        # Value head
-        # AlphaZero style: Conv(1 filter, 1x1) -> BN -> ReLU -> Flatten -> Dense(256, ReLU) -> Dense(1, tanh)
+        # Value head (強化)
+        # Conv(1 filter)->BN->ReLU->Flatten->Dense(value_hidden_units,ReLU)->Dense(value_hidden_units//2,ReLU)->Dense(1,tanh)
         self.value_conv = kl.Conv2D(
-            1, kernel_size=1,
-            use_bias=self.use_bias,
-            kernel_regularizer=l2(0.001),
-            kernel_initializer="he_normal"
+            1, kernel_size=1, use_bias=self.use_bias,
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
         )
         self.value_bn = kl.BatchNormalization()
         self.value_flat = kl.Flatten()
         self.value_fc1 = kl.Dense(
-            256,
-            activation='relu',
-            kernel_regularizer=l2(0.001),
-            kernel_initializer="he_normal"
+            self.value_hidden_units, activation='relu',
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
         )
         self.value_fc2 = kl.Dense(
-            1,
-            activation='tanh',
-            kernel_regularizer=l2(0.001),
-            kernel_initializer="he_normal"
+            self.value_hidden_units // 2, activation='relu',
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
+        )
+        self.value_fc3 = kl.Dense(
+            1, activation='tanh',
+            kernel_regularizer=l2(0.001), kernel_initializer="he_normal"
         )
 
-        # Optional dropout layers in heads if needed
+        # Dropout layers if needed
         if self.dropout_rate > 0:
-            self.policy_dropout = kl.Dropout(self.dropout_rate)
-            self.value_dropout = kl.Dropout(self.dropout_rate)
+            self.policy_dropout1 = kl.Dropout(self.dropout_rate)
+            self.policy_dropout2 = kl.Dropout(self.dropout_rate)
+            self.value_dropout1 = kl.Dropout(self.dropout_rate)
+            self.value_dropout2 = kl.Dropout(self.dropout_rate)
         else:
-            self.policy_dropout = None
-            self.value_dropout = None
+            self.policy_dropout1 = None
+            self.policy_dropout2 = None
+            self.value_dropout1 = None
+            self.value_dropout2 = None
 
     def call(self, inputs, training=False):
         # Initial layers
@@ -170,27 +162,31 @@ class ResNet(keras.Model):
         p = self.policy_conv(x)
         p = self.policy_bn(p, training=training)
         p = relu(p)
-        if self.policy_dropout is not None:
-            p = self.policy_dropout(p, training=training)
         p = self.policy_flat(p)
-        p = self.policy_dense(p)
-        # softmaxは出力時にかける
+        if self.policy_dropout1 is not None:
+            p = self.policy_dropout1(p, training=training)
+        p = self.policy_fc1(p)
+        if self.policy_dropout2 is not None:
+            p = self.policy_dropout2(p, training=training)
+        p = self.policy_fc2(p)
         policy_output = tf.nn.softmax(p)
 
         # Value head
         v = self.value_conv(x)
         v = self.value_bn(v, training=training)
         v = relu(v)
-        if self.value_dropout is not None:
-            v = self.value_dropout(v, training=training)
         v = self.value_flat(v)
+        if self.value_dropout1 is not None:
+            v = self.value_dropout1(v, training=training)
         v = self.value_fc1(v)
-        v = self.value_fc2(v)  # tanh出力
+        if self.value_dropout2 is not None:
+            v = self.value_dropout2(v, training=training)
+        v = self.value_fc2(v)
+        v = self.value_fc3(v)  # tanh出力
 
         return policy_output, v
 
     def predict(self, state):
-        # Single state support
         if len(state.shape) == 3:
             state = state[np.newaxis, ...]
         policy, value = self(state, training=False)
