@@ -1,7 +1,8 @@
 import collections
-from typing import List, Tuple
-import numpy as np
 from dataclasses import dataclass
+from typing import List, Tuple
+
+import numpy as np
 
 from rl.game import encode_state
 
@@ -12,11 +13,6 @@ class Sample:
     mcts_policy: np.ndarray
     reward: float
 
-@dataclass
-class Sample:
-    state: np.ndarray
-    mcts_policy: np.ndarray
-    reward: float
 
 class ReplayBuffer:
     def __init__(self, buffer_size: int):

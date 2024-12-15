@@ -1,6 +1,5 @@
-from collections import deque
-from typing import List, Tuple, Dict, Optional
-import matplotlib.pyplot as plt
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 
 """
