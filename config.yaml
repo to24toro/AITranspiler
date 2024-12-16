@@ -1,30 +1,30 @@
 game_settings:
-  N: 6
-  gate: 0.01
+  N: 10
+  gate: 0.
   layer: 0.
-  MAX_STEPS: 13
+  MAX_STEPS: 45
 
 mcts_settings:
   c_puct: 4
   epsilon: 0.7
   dirichlet_alpha: 0.7
-  num_mcts_simulations: 100  # 探索回数を増加
-  max_depth: 13      # 探索深さを増加
+  num_mcts_simulations: 200  # 探索回数を増加
+  max_depth: 45    # 探索深さを増加
 
 network_settings:
   n_blocks: 24
   filters: 256             # フィルタ数を増加
   use_bias: False
   use_se: True
-  learning_rate: 0.0001
+  learning_rate: 0.0004
 
 training_settings:
   num_cpus: 8
   num_gpus: 0
-  n_episodes: 300
-  buffer_size: 400          # リプレイバッファサイズを減少
+  n_episodes: 200
+  buffer_size: 600          # リプレイバッファサイズを減少
   batch_size: 64
-  epochs_per_update: 50
-  update_period: 50
-  save_period: 50
-  eval_period: 50
+  epochs_per_update: 40
+  update_period: 40
+  save_period: 40
+  eval_period: 40
