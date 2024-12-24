@@ -27,8 +27,7 @@ class ReplayBuffer:
         samples = [self.buffer[idx] for idx in indices]
 
         states = np.stack(
-            [torch.tensor(s.state, dtype=torch.float32)
-                .unsqueeze(0) for s in samples], axis=0
+            [torch.tensor(s.state, dtype=torch.float32) for s in samples], axis=0
         )
 
         mcts_policy = np.array([s.mcts_policy for s in samples], dtype=np.float32)

@@ -58,9 +58,10 @@ class ResNet(nn.Module):
         self.dropout_rate = network_settings.get("dropout_rate", 0.1)
         self.value_hidden_units = network_settings.get("value_hidden_units", 256)
         self.policy_hidden_units = network_settings.get("policy_hidden_units", 256)
+        self.input_channel = 2*max((self.qubits-2)//4,2)-1
 
         # Initial convolution + BN
-        self.conv1 = nn.Conv2d(1, self.filters, kernel_size=3, padding=1, bias=self.use_bias)
+        self.conv1 = nn.Conv2d(self.input_channel, self.filters, kernel_size=3, padding=1, bias=self.use_bias)
         self.bn1 = nn.BatchNorm2d(self.filters)
 
         # Residual blocks
@@ -122,7 +123,7 @@ class ResNet(nn.Module):
 
     def predict(self, mat):
         # Convert input state to PyTorch tensor
-        state = torch.tensor(mat, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+        state = torch.tensor(mat, dtype=torch.float32).unsqueeze(0)
         with torch.no_grad():
             policy, value = self(state)
         return policy, value

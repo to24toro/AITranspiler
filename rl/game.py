@@ -45,6 +45,8 @@ class Game:
         self.used_columns_set: set = set()
         self.current_layer: int = 1
         self.action_space = len(self.coupling_map)
+        self.state_history = np.tile(self.state[np.newaxis, :, :], (max((qubits-2)//4,2), 1, 1))
+        self.action_history = np.full((max((qubits-2)//4,2)-1, qubits,qubits),2,dtype=np.int32)
 
     def _generate_coupling_map(self) -> List[Tuple[int, int]]:
         """
@@ -130,7 +132,7 @@ class Game:
         return True
 
     def step(
-        self, mat: np.ndarray, action: int, prev_action: Optional[int]
+        self, mat: np.ndarray, action: int, prev_action: Optional[int], state_history,action_history
     ) -> Tuple[np.ndarray, bool, float]:
         """
         Execute an action (column swap), update the state, and calculate the score.
@@ -145,9 +147,11 @@ class Game:
             action = np.random.choice(self.get_valid_actions(mat, prev_action))
 
         if self.is_done(mat):
-            return mat, True, 0.0
+            return mat, True, 0.0, state_history,action_history
         action_score = 0
         new_mat = mat.copy()
+        new_history = state_history.copy()
+        new_action_history = action_history.copy()
 
         if action < len(self.coupling_map):
             col1, col2 = self.coupling_map[action]
@@ -179,9 +183,17 @@ class Game:
                 action_score += self.gate
             self.reset_used_columns()
             action_score += self.layer_penalty
-                
+        new_history = np.roll(new_history,1,axis=0)
+        new_history[0] = new_mat
+        new_action_history = np.roll(new_action_history,1,axis=0)
+        action_board = np.zeros((self.qubits, self.qubits), dtype=np.int32)
+        action_board[:, col1] = 1
+        action_board[:, col2] = 1
+        action_board[col1, :] = 1
+        action_board[col2, :] = 1
+        new_action_history[0] = action_board
         done = self.is_done(new_mat)
-        return new_mat, done, action_score
+        return new_mat, done, action_score, new_history, new_action_history
 
     def is_done(self, mat: np.ndarray) -> bool:
         """
