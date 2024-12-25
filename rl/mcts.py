@@ -54,7 +54,7 @@ class MCTS:
         decay_factor = min(1, self.current_episode / self.tau_decay_steps)
         return self.initial_tau * (1 - decay_factor) + self.final_tau * decay_factor
 
-    def search(self, root_state, num_simulations, prev_action,root_history,root_action_history):
+    def search(self, root_state, num_simulations, prev_action):
         """
         Perform MCTS simulations starting from the root state.
 
@@ -67,7 +67,7 @@ class MCTS:
         s = self.state_to_str(root_state)
 
         if s not in self.P:
-            _ = self._expand(root_state,root_history,root_action_history, prev_action)
+            _ = self._expand(root_state, prev_action)
 
         valid_actions = self.game.get_valid_actions(root_state, prev_action)
 
@@ -108,22 +108,12 @@ class MCTS:
 
             # Lazy evaluation: If next_state not computed yet, compute it now.
             if self.next_states[s][action] is None:
-                next_state, done, _,next_history,next_action_history = self.game.step(root_state, action, prev_action,root_history,root_action_history)
+                next_state, done, _ = self.game.step(root_state, action, prev_action)
                 self.next_states[s][action] = next_state
             else:
                 next_state = self.next_states[s][action]
-                next_history = np.roll(root_history,1,axis=0)
-                next_history[0] = next_state
-                col1,col2 = self.game.coupling_map[action]
-                next_action_history = np.roll(root_action_history,1,axis=0)
-                action_board = np.zeros((self.qubits, self.qubits), dtype=np.int32)
-                action_board[:, col1] = 1
-                action_board[:, col2] = 1
-                action_board[col1, :] = 1
-                action_board[col2, :] = 1
-                next_action_history[0] = action_board
 
-            v = self._evaluate(next_state,next_history,next_action_history, prev_action=action, max_depth=self.max_depth)
+            v = self._evaluate(next_state, prev_action=action, max_depth=self.max_depth)
 
             # Update W and N values for the selected action.
             self.W[s][action] += v
@@ -136,7 +126,7 @@ class MCTS:
 
         return mcts_policy
 
-    def _expand(self, state,history,action_history, prev_action):
+    def _expand(self, state, prev_action):
         """
         Expand a state node in the tree by initializing its attributes.
 
@@ -145,8 +135,7 @@ class MCTS:
         :return: The neural network's value prediction for the state.
         """
         s = self.state_to_str(state)
-        combined = np.stack([history[:-1], action_history], axis=1).reshape(-1, *history[:-1].shape[1:])
-        state = np.vstack([combined, history[-1][np.newaxis,...]])
+
         nn_policy, nn_value = self.network.predict(state)
 
         nn_policy = nn_policy.numpy()[0]
@@ -161,7 +150,7 @@ class MCTS:
 
         return nn_value
 
-    def _evaluate(self, state,history,action_history, prev_action=None, total_score=0, depth=0, max_depth=1000):
+    def _evaluate(self, state, prev_action=None, total_score=0, depth=0, max_depth=1000):
         """
         Evaluate a state by recursively simulating games up to a maximum depth.
 
@@ -182,7 +171,7 @@ class MCTS:
             return reward
 
         elif s not in self.P:
-            nn_value = self._expand(state,history,action_history, prev_action)
+            nn_value = self._expand(state, prev_action)
             return nn_value
         else:
             U = [
@@ -213,23 +202,13 @@ class MCTS:
 
             # Lazy evaluation of next_state
             if self.next_states[s][action] is None:
-                next_state, done, score,next_history,next_action_history = self.game.step(state, action, prev_action,history,action_history)
+                next_state, done, score = self.game.step(state, action, prev_action)
                 self.next_states[s][action] = next_state
             else:
                 next_state = self.next_states[s][action]
-                next_history = np.roll(history,1,axis=0)
-                next_history[0] = next_state
-                col1,col2 = self.game.coupling_map[action]
-                next_action_history = np.roll(action_history,1,axis=0)
-                action_board = np.zeros((self.qubits, self.qubits), dtype=np.int32)
-                action_board[:, col1] = 1
-                action_board[:, col2] = 1
-                action_board[col1, :] = 1
-                action_board[col2, :] = 1
-                next_action_history[0] = action_board
 
             v = self._evaluate(
-                next_state,next_history,next_action_history,
+                next_state,
                 prev_action=action,
                 total_score=total_score,
                 depth=depth + 1,

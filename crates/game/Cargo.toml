@@ -1,18 +1,15 @@
 [package]
-name = "zerogame"
+name = "game"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
 [lib]
-name = "zerogame"
-doctest = false
 crate-type = ["cdylib"]
 
 [dependencies]
 ndarray.workspace = true
-rand = "0.8"
-
-[dependencies.pyo3]
-workspace = true
-features = ["py-clone"]
+rand.workspace = true
+numpy.workspace = true
+pyo3.workspace = true
+rand_distr = "0.5" 

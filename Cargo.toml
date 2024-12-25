@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*"]
+members = ["crates/game"]
 resolver = "2"
 
 [workspace.package]
@@ -10,11 +10,9 @@ rust-version = "1.70"
 [workspace.dependencies]
 ndarray = "0.15"
 rand = "0.8"
-
-pyo3 = "0.22.6"
-
-zerogame = { path = "crates/zerogame" }
+numpy = "0.22.1"
+pyo3 = { version = "0.22.6", features = ["extension-module"] }
 
 [profile.release]
-lto = 'fat'
+lto = "fat"
 codegen-units = 1
